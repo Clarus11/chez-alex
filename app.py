@@ -59,7 +59,7 @@ if verifier_mot_de_passe():
         st.session_state.reveler_donnees = False
 
     # --- LE CONTENU DU SITE ---
-    st.title("🏖️ Centre de Pilotage - Chez Alex 2026")
+    st.title("🏖️ Chez Alex 2026")
     
     # --- BARRE LATÉRALE : AJOUT RAPIDE & DÉCONNEXION ---
     with st.sidebar:
