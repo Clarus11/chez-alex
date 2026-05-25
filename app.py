@@ -4,17 +4,14 @@ import pandas as pd
 # Configuration de la page
 st.set_page_config(page_title="Pilotage Chez Alex", page_icon="🏖️", layout="wide")
 
-# --- SYSTÈME DE SÉCURITÉ ---
+# --- SYSTÈME DE SÉCURITÉ 1 : LE MOT DE PASSE ---
 def verifier_mot_de_passe():
-    """Retourne True si l'utilisateur a entré le bon mot de passe."""
     if "authentifie" not in st.session_state:
         st.session_state.authentifie = False
 
-    # Si déjà connecté, on ne demande plus rien
     if st.session_state.authentifie:
         return True
 
-    # Affichage de la page de connexion
     st.markdown("<h2 style='text-align: center;'>🔒 Accès Sécurisé - Chez Alex</h2>", unsafe_allow_html=True)
     st.write("")
     
@@ -24,7 +21,6 @@ def verifier_mot_de_passe():
         bouton_connexion = st.button("Se connecter")
         
         if bouton_connexion:
-            # On compare avec le mot de passe caché dans les "Secrets" de Streamlit
             if mdp_saisi == st.secrets["password"]:
                 st.session_state.authentifie = True
                 st.success("Connexion réussie !")
@@ -33,14 +29,17 @@ def verifier_mot_de_passe():
                 st.error("Mot de passe incorrect ❌")
     return False
 
-# On vérifie la sécurité. Si c'est faux, on arrête le code ici.
+# Fonction pour masquer les numéros de téléphone (Sécurité 2)
+def masquer_telephone(tel):
+    if pd.isna(tel) or len(str(tel)) < 4:
+        return "•• •• •• •• ••"
+    tel_str = str(tel)
+    return f"{tel_str[:2]} •• •• •• {tel_str[-2:]}"
+
+# Si le premier verrou est passé, on charge le site
 if verifier_mot_de_passe():
 
-    # --- LE VRAI CONTENU DU SITE (Invisible tant que le mot de passe n'est pas bon) ---
-    st.title("🏖️ Centre de Pilotage - Chez Alex 2026")
-    st.write("Bienvenue dans ton espace sécurisé.")
-
-    # Initialisation des données de test basées sur ton Google Sheet
+    # --- INITIALISATION DES DONNÉES ---
     if 'reservations' not in st.session_state:
         st.session_state.reservations = pd.DataFrame([
             {
@@ -55,13 +54,20 @@ if verifier_mot_de_passe():
             }
         ])
 
-    # --- BARRE LATÉRALE : AJOUT RAPIDE ---
+    # Initialisation de l'état du deuxième verrou (Masquage)
+    if "reveler_donnees" not in st.session_state:
+        st.session_state.reveler_donnees = False
+
+    # --- LE CONTENU DU SITE ---
+    st.title("🏖️ Centre de Pilotage - Chez Alex 2026")
+    
+    # --- BARRE LATÉRALE : AJOUT RAPIDE & DÉCONNEXION ---
     with st.sidebar:
         st.header("➕ Nouveau Client")
         with st.form("ajout_form", clear_on_submit=True):
             f_date = st.date_input("Date")
             f_nom = st.text_input("Nom")
-            f_tel = st.text_input("Téléphone")
+            f_tel = st.text_input("Téléphone (Ex: 0612345678)")
             f_nb = st.number_input("Transats", min_value=1, value=2)
             f_heure = st.time_input("Heure")
             f_type = st.selectbox("Type", ["Standard", "Abonné"])
@@ -79,41 +85,61 @@ if verifier_mot_de_passe():
                 }
                 st.session_state.reservations = pd.concat([st.session_state.reservations, pd.DataFrame([nouveau])], ignore_index=True)
                 st.rerun()
+        
+        st.write("---")
+        if st.button("🚪 Quitter la session", use_container_width=True):
+            st.session_state.authentifie = False
+            st.rerun()
 
-    # --- TABLEAU DE BORD (STATS COIN SUPERIEUR) ---
+    # --- STATISTIQUES ---
     col1, col2, col3 = st.columns(3)
     total_transats = st.session_state.reservations["Nombre transats"].sum()
-    ca_estime = total_transats * 20 # Exemple à 20€ le transat
-
     with col1:
         st.metric("Total Transats Loués", f"{total_transats}")
     with col2:
         st.metric("Nombre de réservations", len(st.session_state.reservations))
     with col3:
-        st.metric("Recette estimée", f"{ca_estime} €")
+        st.metric("Recette estimée (20€/u)", f"{total_transats * 20} €")
 
     st.divider()
 
-    # --- PLANNING INTERACTIF MODIFIABLE ---
+    # --- PLANNING INTERACTIF & SÉCURITÉ 2 ---
     st.subheader("📝 Planning Interactif")
-    st.info("💡 Double-clique dans une case pour modifier une information en direct !")
+    
+    # Bouton d'action pour activer/désactiver le deuxième verrou
+    col_btn1, col_btn2 = st.columns([3, 1])
+    with col_btn2:
+        if st.session_state.reveler_donnees:
+            if st.button("👁️ Masquer les téléphones", type="secondary", use_container_width=True):
+                st.session_state.reveler_donnees = False
+                st.rerun()
+        else:
+            if st.button("👁️ Révéler les téléphones", type="primary", use_container_width=True):
+                st.session_state.reveler_donnees = True
+                st.rerun()
 
+    # Préparation du tableau avec ou sans masquage
+    df_affichage = st.session_state.reservations.copy()
+    if not st.session_state.reveler_donnees:
+        df_affichage["Téléphone"] = df_affichage["Téléphone"].apply(masquer_telephone)
+
+    st.info("💡 Les modifications directes sont bloquées lorsque les téléphones sont masqués pour éviter les erreurs.")
+
+    # Affichage du tableau de bord (modifiable uniquement si révélé, pour la sécurité des données)
     edited_df = st.data_editor(
-        st.session_state.reservations,
+        df_affichage,
         use_container_width=True,
         num_rows="dynamic",
+        disabled=not st.session_state.reveler_donnees, # Bloque l'édition si masqué
         column_config={
             "Statut": st.column_config.SelectboxColumn(options=["En attente", "Confirmé", "Arrivé", "Annulé"]),
             "Type": st.column_config.SelectboxColumn(options=["Standard", "Abonné"])
         }
     )
 
-    if st.button("💾 Enregistrer les modifications du tableau"):
-        st.session_state.reservations = edited_df
-        st.success("Toutes les modifications ont été enregistrées avec succès !")
-        st.rerun()
-
-    # --- DECONNEXION ---
-    if st.sidebar.button("🚪 Quitter la session"):
-        st.session_state.authentifie = False
-        st.rerun()
+    # Sauvegarde des modifications
+    if st.session_state.reveler_donnees:
+        if st.button("💾 Enregistrer les modifications du tableau"):
+            st.session_state.reservations = edited_df
+            st.success("Toutes les modifications ont été enregistrées avec succès !")
+            st.rerun()
