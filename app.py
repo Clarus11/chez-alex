@@ -104,7 +104,7 @@ if verifier_mot_de_passe():
     st.divider()
 
     # --- PLANNING INTERACTIF & SÉCURITÉ 2 ---
-    st.subheader("📝 Planning Interactif")
+    st.subheader("📝 Réservation ")
     
     # Bouton d'action pour activer/désactiver le deuxième verrou
     col_btn1, col_btn2 = st.columns([3, 1])
