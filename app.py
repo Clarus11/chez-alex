@@ -4,34 +4,44 @@ from datetime import datetime
 # --- CONFIGURATION INITIALE ---
 st.set_page_config(page_title="Chez Alex 2026", page_icon="🏖️", layout="wide")
 
-# --- STYLE CSS POUR LE RENDU SMARTPHONE (GRILLE DE LA PLAGE) ---
+# --- STYLE CSS AVANCÉ POUR LE RENDU HORIZONTAL ET LA POP-UP ---
 st.markdown("""
     <style>
-    /* Mode smartphone : on force les boutons à être carrés et compacts */
+    /* Force les 11 colonnes (5 + allée + 5) à rester sur la même ligne horizontale, même sur téléphone */
+    div[data-testid="stHorizontalBlock"] {
+        display: flex !important;
+        flex-wrap: nowrap !important;
+        gap: 3px !important;
+        align-items: center !important;
+        padding: 0 !important;
+    }
+    
+    /* Style des boutons transats carrés et compacts */
     .stButton > button {
         width: 100% !important;
-        height: 50px !important;
-        padding: 0px !important;
-        font-size: 13px !important;
+        height: 55px !important;
+        padding: 2px !important;
+        font-size: 11px !important;
+        line-height: 1.2 !important;
         font-weight: bold !important;
-        border-radius: 8px !important;
-        margin-bottom: 5px;
+        border-radius: 6px !important;
     }
-    /* Style de l'allée centrale */
-    .allee-centrale {
-        text-align: center;
+    
+    /* Style mini pour l'allée centrale verticale */
+    .allee-verticale {
         background-color: #fef08a;
         color: #854d0e;
         font-weight: bold;
-        padding: 6px;
-        border-radius: 6px;
-        margin: 10px 0;
-        font-size: 14px;
-        letter-spacing: 2px;
-    }
-    /* Style du menu latéral */
-    [data-testid="stSidebar"] {
-        background-color: #f8fafc;
+        text-align: center;
+        padding: 15px 2px;
+        border-radius: 4px;
+        font-size: 10px;
+        writing-mode: vertical-lr; /* Écrit le texte verticalement */
+        transform: rotate(180deg);
+        height: 55px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -54,23 +64,16 @@ if not st.session_state.autorise:
 else:
 
     # --- INITIALISATION DE LA PLAGE COMPLÈTE (7 LIGNES x 10 GROUPES) ---
-    # Si la plage n'existe pas encore en mémoire, on la crée vide
     if "plage" not in st.session_state:
         st.session_state.plage = {}
         for ligne in range(1, 8):
             for groupe in range(1, 11):
                 id_case = f"L{ligne}-G{groupe}"
-                # Pour le test, on laisse vide. Statut peut être: "Libre" ou "Occupé"
                 st.session_state.plage[id_case] = {"statut": "Libre", "client": "", "heure": ""}
 
-    # Variable pour savoir quel groupe est cliqué
-    if "groupe_selectionne" not in st.session_state:
-        st.session_state.groupe_selectionne = None
-
-    # --- MENU LATÉRAL (TON DESIGN) ---
+    # --- MENU LATÉRAL ---
     with st.sidebar:
         st.markdown("<h3 style='color: #1e3a8a;'>MENU</h3>", unsafe_allow_html=True)
-        # Les onglets de ton dessin
         page = st.radio(
             "Navigation :",
             ["🏖️ Plan de la plage", "📅 Réservations", "🚣 Pédalos", "📦 Stocks", "📊 Chiffre d'Affaires", "📝 Notes (Besoins)"]
@@ -80,99 +83,98 @@ else:
     # ONGLET PRINCIPAL : LE PLAN DE LA PLAGE
     # ==========================================
     if page == "🏖️ Plan de la plage":
-        st.markdown("<h2 style='text-align: center; color: #1e3a8a;'>🏖️ PLAN DE LA PLAGE</h2>", unsafe_allow_html=True)
+        st.markdown("<h2 style='text-align: center; color: #1e3a8a;'>🏖️ PLAN DU JOUR</h2>", unsafe_allow_html=True)
         st.write("---")
 
-        # Affichage des 7 lignes
+        # Affichage des 7 lignes de la plage
         for ligne in range(1, 8):
             st.markdown(f"**Ligne {ligne}**")
             
-            # 5 Groupes à GAUCHE de l'allée
-            cols_gauche = st.columns(5)
-            for i, col in enumerate(cols_gauche, start=1):
-                id_case = f"L{ligne}-G{i}"
-                info = st.session_state.plage[id_case]
-                
-                # Couleur et texte du bouton selon l'état
-                if info["statut"] == "Libre":
-                    label = f"🟢 Gp {i}\n(Libre)"
-                    type_bouton = "secondary"
-                else:
-                    label = f"🔴 Gp {i}\n{info['client']}\n({info['heure']})"
-                    type_bouton = "primary"
-                
-                if col.button(label, key=id_case, type=type_bouton):
-                    st.session_state.groupe_selectionne = id_case
-
-            # L'ALLÉE CENTRALE (Entre le groupe 5 et 6)
-            st.markdown("<div class='allee-centrale'>🚧 ALLÉE CENTRALE 🚧</div>", unsafe_allow_html=True)
-
-            # 5 Groupes à DROITE de l'allée
-            cols_droite = st.columns(5)
-            for i, col in enumerate(cols_droite, start=6):
-                id_case = f"L{ligne}-G{i}"
-                info = st.session_state.plage[id_case]
-                
-                if info["statut"] == "Libre":
-                    label = f"🟢 Gp {i}\n(Libre)"
-                    type_bouton = "secondary"
-                else:
-                    label = f"🔴 Gp {i}\n{info['client']}\n({info['heure']})"
-                    type_bouton = "primary"
-                
-                if col.button(label, key=id_case, type=type_bouton):
-                    st.session_state.groupe_selectionne = id_case
+            # On crée 11 colonnes réelles côte à côte : 5 places + 1 allée + 5 places
+            colonnes = st.columns([1, 1, 1, 1, 1, 0.6, 1, 1, 1, 1, 1])
             
-            st.write("") # Espace entre les lignes
+            # --- Les 5 premiers groupes (Gauche) ---
+            for i in range(1, 6):
+                id_case = f"L{ligne}-G{i}"
+                info = st.session_state.plage[id_case]
+                
+                if info["statut"] == "Libre":
+                    label = f"🟢<br>Gp {i}"
+                    type_bouton = "secondary"
+                else:
+                    label = f"🔴<br>{info['client']}<br>{info['heure']}"
+                    type_bouton = "primary"
+                
+                # On affiche dans la bonne colonne (0 à 4)
+                if colonnes[i-1].button(label, key=id_case, type=type_bouton):
+                    st.session_state.groupe_selectionne = id_case
+                    st.rerun()
+
+            # --- L'allée centrale (Colonne du milieu, index 5) ---
+            with colonnes[5]:
+                st.markdown("<div class='allee-verticale'>ALLÉE</div>", unsafe_allow_html=True)
+
+            # --- Les 5 derniers groupes (Droite) ---
+            for i in range(6, 11):
+                id_case = f"L{ligne}-G{i}"
+                info = st.session_state.plage[id_case]
+                
+                if info["statut"] == "Libre":
+                    label = f"🟢<br>Gp {i}"
+                    type_bouton = "secondary"
+                else:
+                    label = f"🔴<br>{info['client']}<br>{info['heure']}"
+                    type_bouton = "primary"
+                
+                # On affiche dans la bonne colonne (index 6 à 10)
+                if colonnes[i].button(label, key=id_case, type=type_bouton):
+                    st.session_state.groupe_selectionne = id_case
+                    st.rerun()
+            
+            st.write("") # Petit espace sous la ligne
 
         # ==========================================
-        # FENÊTRE DE DIALOGUE (Quand on clique sur une place)
+        # FENÊTRE POP-UP (MODAL PAR-DESSUS)
         # ==========================================
-        if st.session_state.groupe_selectionne:
-            id_sel = st.session_state.groupe_selectionne
+        # Grâce à st.dialog, la boîte s'ouvre au milieu de l'écran par-dessus le reste !
+        @st.dialog("Détails de l'emplacement")
+        def ouvrir_fiche_client(id_sel):
             info_sel = st.session_state.plage[id_sel]
-            
+            st.markdown(f"### ⚙️ Gestion du **{id_sel.replace('L', 'Ligne ').replace('-G', ' - Groupe ')}**")
             st.write("---")
-            st.markdown(f"### ⚙️ Gestion du **{id_sel.replace('-', ' ')}**")
             
             if info_sel["statut"] == "Libre":
-                # Formulaire d'installation rapide
-                with st.form("installation_client"):
-                    nom_c = st.text_input("Nom du client :")
-                    heure_a = st.text_input("Heure d'arrivée :", value=datetime.now().strftime("%H:%M"))
-                    
-                    if st.form_submit_button("✅ Installer"):
-                        if nom_c:
-                            st.session_state.plage[id_sel] = {"statut": "Occupé", "client": nom_c, "heure": heure_a}
-                            st.session_state.groupe_selectionne = None # Ferme la zone de gestion
-                            st.rerun()
-                        else:
-                            st.error("Veuillez entrer un nom.")
+                nom_c = st.text_input("👤 Nom du client :")
+                heure_a = st.text_input("⏰ Heure d'arrivée :", value=datetime.now().strftime("%H:%M"))
+                
+                if st.form_submit_button if False else st.button("✅ Installer le client", type="primary"):
+                    if nom_c:
+                        st.session_state.plage[id_sel] = {"statut": "Occupé", "client": nom_c, "heure": heure_a}
+                        st.session_state.groupe_selectionne = None
+                        st.rerun()
+                    else:
+                        st.error("Veuillez entrer un nom.")
             else:
-                # Si la place est occupée, on affiche les infos et le bouton de libération
-                st.info(f"👤 Client : **{info_sel['client']}** installé à **{info_sel['heure']}**")
+                st.markdown(f"👤 **Client :** {info_sel['client']}")
+                st.markdown(f"⏰ **Arrivé à :** {info_sel['heure']}")
+                st.write("---")
+                st.write("🛒 **Ardoise / Consommations :**")
+                st.caption("(Les boutons boissons arriveront ici à la prochaine étape)")
                 
-                # Simulation de l'ardoise (on rajoutera les vrais boutons boissons après)
-                st.write("🛒 *Ardoise en cours... (Bientôt les consommations ici)*")
-                
-                if st.button("💵 Encaisser et Libérer la place", type="primary"):
+                st.write("---")
+                if st.button("💵 Encaisser et libérer", type="primary"):
                     st.session_state.plage[id_sel] = {"statut": "Libre", "client": "", "heure": ""}
                     st.session_state.groupe_selectionne = None
-                    st.success("Place libérée !")
                     st.rerun()
-                
-                if st.button("❌ Fermer sans modifier"):
-                    st.session_state.groupe_selectionne = None
-                    st.rerun()
+            
+            if st.button("❌ Fermer"):
+                st.session_state.groupe_selectionne = None
+                st.rerun()
+
+        # Si un groupe a été cliqué, on lance la fonction de la pop-up
+        if "groupe_selectionne" in st.session_state and st.session_state.groupe_selectionne is not None:
+            ouvrir_fiche_client(st.session_state.groupe_selectionne)
 
     # --- AUTRES PAGES EN ATTENTE ---
-    elif page == "📅 Réservations":
-        st.info("Page Réservations en cours de préparation...")
-    elif page == "🚣 Pédalos":
-        st.info("Page Pédalos en cours de préparation...")
-    elif page == "📦 Stocks":
-        st.info("Page Stocks en cours de préparation...")
-    elif page == "📊 Chiffre d'Affaires":
-        st.info("Page Chiffre d'Affaires en cours de préparation...")
-    elif page == "📝 Notes (Besoins)":
-        st.info("Page Notes & Besoins en cours de préparation...")
+    elif page in ["📅 Réservations", "🚣 Pédalos", "📦 Stocks", "📊 Chiffre d'Affaires", "📝 Notes (Besoins)"]:
+        st.info(f"Page {page} en cours de préparation...")
