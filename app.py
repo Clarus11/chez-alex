@@ -1,240 +1,178 @@
 import streamlit as st
-import pandas as pd
 from datetime import datetime
 
-# --- CONFIGURATION DE LA PAGE ---
-st.set_page_config(page_title="Chez Alex - Gestion Plage", page_icon="🏖️", layout="wide")
+# --- CONFIGURATION INITIALE ---
+st.set_page_config(page_title="Chez Alex 2026", page_icon="🏖️", layout="wide")
 
-# --- STYLE SMARTPHONE & GROS BOUTONS ---
+# --- STYLE CSS POUR LE RENDU SMARTPHONE (GRILLE DE LA PLAGE) ---
 st.markdown("""
     <style>
-    .stButton>button {
-        width: 100%;
-        height: 55px;
-        font-size: 16px !important;
-        font-weight: bold;
-        border-radius: 12px;
-        margin-bottom: 8px;
+    /* Mode smartphone : on force les boutons à être carrés et compacts */
+    .stButton > button {
+        width: 100% !important;
+        height: 50px !important;
+        padding: 0px !important;
+        font-size: 13px !important;
+        font-weight: bold !important;
+        border-radius: 8px !important;
+        margin-bottom: 5px;
     }
-    div[data-testid="stHorizontalBlock"] {
-        background: #fdfdfd;
-        padding: 10px;
-        border-radius: 15px;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-        margin-bottom: 15px;
+    /* Style de l'allée centrale */
+    .allee-centrale {
+        text-align: center;
+        background-color: #fef08a;
+        color: #854d0e;
+        font-weight: bold;
+        padding: 6px;
+        border-radius: 6px;
+        margin: 10px 0;
+        font-size: 14px;
+        letter-spacing: 2px;
+    }
+    /* Style du menu latéral */
+    [data-testid="stSidebar"] {
+        background-color: #f8fafc;
     }
     </style>
     """, unsafe_allow_html=True)
 
-# --- SÉCURITÉ : MOT DE PASSE GENERAL ---
-if "authentifie" not in st.session_state:
-    st.session_state.authentifie = False
+# --- PROTECTION PAR MOT DE PASSE ---
+if "autorise" not in st.session_state:
+    st.session_state.autorise = False
 
-if not st.session_state.authentifie:
-    st.markdown("<h2 style='text-align: center;'>🔒 Accès Sécurisé - Chez Alex</h2>", unsafe_allow_html=True)
+if not st.session_state.autorise:
+    st.markdown("<h2 style='text-align: center; color: #1e3a8a;'>🏖️ Chez Alex - Gestion Plage</h2>", unsafe_allow_html=True)
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
-        mdp_saisi = st.text_input("Mot de passe de la plage :", type="password")
-        if st.button("Se connecter 🔓"):
-            if mdp_saisi == st.secrets["password"]:
-                st.session_state.authentifie = True
+        mdp = st.text_input("Entrez le mot de passe de la plage :", type="password")
+        if st.button("Ouvrir l'application 🔓"):
+            if mdp == st.secrets["password"]:
+                st.session_state.autorise = True
                 st.rerun()
             else:
                 st.error("Mot de passe incorrect ❌")
 else:
-    # --- CONFIGURATION DES TARIFS ---
-    TARIFS_TRANSATS = {"Journée": 15.0, "Demi-Journée (5h)": 12.0, "2 Heures": 7.0, "Abonné (Suivi)": 0.0}
-    TARIFS_CONSO = {
-        "Soda": 2.5, "Grande eau": 2.5, "Petite eau": 1.5, 
-        "Café / Thé": 1.0, "Jus d'orange": 5.0, "Virgin mojito": 6.0, "Glace": 3.8
-    }
-    TARIFS_PEDALO = {"30 min": 15.0, "1h": 20.0}
 
-    # --- INITIALISATION DE LA MEMOIRE DE L'APPLICATION ---
-    if 'plage_data' not in st.session_state:
-        st.session_state.plage_data = {}
-    if 'pedalos' not in st.session_state:
-        st.session_state.pedalos = []
-    if 'historique_ventes' not in st.session_state:
-        st.session_state.historique_ventes = []
-    if "voir_tel" not in st.session_state:
-        st.session_state.voir_tel = False
+    # --- INITIALISATION DE LA PLAGE COMPLÈTE (7 LIGNES x 10 GROUPES) ---
+    # Si la plage n'existe pas encore en mémoire, on la crée vide
+    if "plage" not in st.session_state:
+        st.session_state.plage = {}
+        for ligne in range(1, 8):
+            for groupe in range(1, 11):
+                id_case = f"L{ligne}-G{groupe}"
+                # Pour le test, on laisse vide. Statut peut être: "Libre" ou "Occupé"
+                st.session_state.plage[id_case] = {"statut": "Libre", "client": "", "heure": ""}
 
-    # --- MENU PRINCIPAL TACTILE ---
-    onglet = st.radio("Aller à :", ["🏖️ Plan des Transats", "🚣 Pédalos", "📊 Fin de journée (Archives)"], horizontal=True)
-    st.divider()
+    # Variable pour savoir quel groupe est cliqué
+    if "groupe_selectionne" not in st.session_state:
+        st.session_state.groupe_selectionne = None
+
+    # --- MENU LATÉRAL (TON DESIGN) ---
+    with st.sidebar:
+        st.markdown("<h3 style='color: #1e3a8a;'>MENU</h3>", unsafe_allow_html=True)
+        # Les onglets de ton dessin
+        page = st.radio(
+            "Navigation :",
+            ["🏖️ Plan de la plage", "📅 Réservations", "🚣 Pédalos", "📦 Stocks", "📊 Chiffre d'Affaires", "📝 Notes (Besoins)"]
+        )
 
     # ==========================================
-    # ONGLET 1 : LE PLAN DES TRANSATS (MINI-GROUPES DE 2)
+    # ONGLET PRINCIPAL : LE PLAN DE LA PLAGE
     # ==========================================
-    if onglet == "🏖️ Plan des Transats":
-        st.subheader("📋 Plan de la Plage (10 groupes de 2 transats par ligne)")
-        
-        if st.button("👁️ Afficher/Masquer les Téléphones (Sécurité)", type="secondary"):
-            st.session_state.voir_tel = not st.session_state.voir_tel
-            st.rerun()
+    if page == "🏖️ Plan de la plage":
+        st.markdown("<h2 style='text-align: center; color: #1e3a8a;'>🏖️ PLAN DE LA PLAGE</h2>", unsafe_allow_html=True)
+        st.write("---")
 
-        ligne_choisie = st.selectbox("Sélectionner la Ligne :", [f"Ligne {i}" for i in range(1, 8)])
-        num_ligne = ligne_choisie.split()[1]
-
-        st.write("### Cliquez sur un groupe de 2 transats :")
-        
-        # Partie Gauche : Groupes 1 à 5
-        col_gauche = st.columns(5)
-        for idx, col in enumerate(col_gauche, start=1):
-            id_place = f"{num_ligne}-{idx}"
-            occupe = id_place in st.session_state.plage_data
-            label = f"🔴 Gp {idx}\n(Occupé)" if occupe else f"🟢 Gp {idx}\n(Libre)"
-            if col.button(label, key=f"btn_{id_place}"):
-                st.session_state.emplacement_actif = id_place
-
-        # Allée centrale bien visible
-        st.markdown("<div style='text-align:center; color:#ffaa00; font-weight:bold; padding:10px; background:#fff3cd; border-radius:8px; margin:15px 0;'>🚧 ALLÉE CENTRALE 🚧</div>", unsafe_allow_html=True)
-        
-        # Partie Droite : Groupes 6 à 10
-        col_droite = st.columns(5)
-        for idx, col in enumerate(col_droite, start=6):
-            id_place = f"{num_ligne}-{idx}"
-            occupe = id_place in st.session_state.plage_data
-            label = f"🔴 Gp {idx}\n(Occupé)" if occupe else f"🟢 Gp {idx}\n(Libre)"
-            if col.button(label, key=f"btn_{id_place}"):
-                st.session_state.emplacement_actif = id_place
-
-        # ACTION SUR LE GROUPE SÉLECTIONNÉ
-        if "emplacement_actif" in st.session_state:
-            id_p = st.session_state.emplacement_actif
-            st.divider()
-            st.markdown(f"### ⚙️ Gestion du **Groupe {id_p}** (2 transats)")
+        # Affichage des 7 lignes
+        for ligne in range(1, 8):
+            st.markdown(f"**Ligne {ligne}**")
             
-            # Formulaire d'installation
-            if id_p not in st.session_state.plage_data:
-                with st.form(f"install_{id_p}"):
-                    nom = st.text_input("Nom du client :")
-                    tel = st.text_input("Téléphone :")
-                    forfait = st.selectbox("Tarif Transat (par transat) :", list(TARIFS_TRANSATS.keys()))
-                    nb_transats = st.slider("Nombre de transats utilisés dans ce groupe :", 1, 2, 2)
-                    notes = st.text_input("Notes particulières :")
-                    
-                    if st.form_submit_button("✅ Installer le client"):
-                        st.session_state.plage_data[id_p] = {
-                            "nom": nom, "tel": tel, "forfait": forfait, "nb_transats": nb_transats,
-                            "notes": notes, "conso": [], "heure_arrivee": datetime.now().strftime("%H:%M")
-                        }
-                        st.success("Client installé !")
-                        st.rerun()
-            else:
-                # Gestion des consommations et encaissement
-                client = st.session_state.plage_data[id_p]
-                tel_aff = client['tel'] if st.session_state.voir_tel else "•• •• •• ••"
+            # 5 Groupes à GAUCHE de l'allée
+            cols_gauche = st.columns(5)
+            for i, col in enumerate(cols_gauche, start=1):
+                id_case = f"L{ligne}-G{i}"
+                info = st.session_state.plage[id_case]
                 
-                st.write(f"👤 **Client :** {client['nom']} | 📞 **Tel :** {tel_aff} | ⏰ **Arrivé à :** {client['heure_arrivee']}")
-                st.write(f"🏖️ Forfait : {client['forfait']} ({client['nb_transats']} transat(s) occupé(s))")
+                # Couleur et texte du bouton selon l'état
+                if info["statut"] == "Libre":
+                    label = f"🟢 Gp {i}\n(Libre)"
+                    type_bouton = "secondary"
+                else:
+                    label = f"🔴 Gp {i}\n{info['client']}\n({info['heure']})"
+                    type_bouton = "primary"
                 
-                # Calcul de l'addition
-                prix_ombrage = TARIFS_TRANSATS[client['forfait']] * client['nb_transats']
-                prix_boissons = sum([TARIFS_CONSO[c] for c in client['conso']])
-                total_global = prix_ombrage + prix_boissons
-                
-                st.markdown(f"## 💰 Total à payer : {total_global:.2f} €")
-                
-                # Boutons de consommations rapides
-                st.write("➕ **Ajouter une boisson/glace sur la note :**")
-                c_boites = st.columns(4)
-                for i, item in enumerate(TARIFS_CONSO.keys()):
-                    if c_boites[i % 4].button(f"{item}\n({TARIFS_CONSO[item]}€)"):
-                        st.session_state.plage_data[id_p]['conso'].append(item)
-                        st.success(f"Ajouté : 1 {item}")
-                        st.rerun()
-                
-                if client['conso']:
-                    st.write(f"🛒 **Consos actuelles :** {', '.join(client['conso'])}")
-                
-                st.write("---")
-                # Bouton d'encaissement (Envoie la ligne dans l'historique de la journée)
-                if st.button("💵 CLIENT PAYE & S'EN VA (Enregistrer la vente)", type="primary"):
-                    # On crée la ligne d'archive
-                    vente = {
-                        "Date": datetime.now().strftime("%Y-%m-%d"),
-                        "Type": "Transat",
-                        "Emplacement": f"Groupe {id_p}",
-                        "Nom Client": client['nom'],
-                        "Telephone": client['tel'],
-                        "Détails": f"{client['forfait']} ({client['nb_transats']} transats)",
-                        "Consos": ", ".join(client['conso']) if client['conso'] else "Aucune",
-                        "Total Payé (€)": total_global
-                    }
-                    st.session_state.historique_ventes.append(vente)
-                    st.session_state.plage_data.pop(id_p) # Libère la place
-                    st.success("Vente archivée ! L'emplacement est de nouveau libre.")
-                    st.rerun()
+                if col.button(label, key=id_case, type=type_bouton):
+                    st.session_state.groupe_selectionne = id_case
 
-    # ==========================================
-    # ONGLET 2 : LA PAGE PÉDALOS
-    # ==========================================
-    elif onglet == "🚣 Pédalos":
-        st.subheader("🚣 Location des Pédalos")
-        with st.form("pedalo_form"):
-            p_nom = st.text_input("Nom du client :")
-            p_duree = st.selectbox("Durée :", list(TARIFS_PEDALO.keys()))
-            if st.form_submit_button("🚀 Lancer le pédalo"):
-                st.session_state.pedalos.append({
-                    "nom": p_nom, "duree": p_duree, "prix": TARIFS_PEDALO[p_duree], "statut": "En mer"
-                })
-                st.rerun()
-        
-        st.write("### ⏱️ Pédalos actuellement sortis :")
-        for idx, p in enumerate(st.session_state.pedalos):
-            if p['statut'] == "En mer":
-                col_p1, col_p2 = st.columns([3, 1])
-                with col_p1:
-                    st.write(f"🚣 **{p['nom']}** - Forfait {p['duree']} ({p['prix']} €)")
-                with col_p2:
-                    if st.button("💵 Encaisser Retour", key=f"p_{idx}"):
-                        vente_p = {
-                            "Date": datetime.now().strftime("%Y-%m-%d"),
-                            "Type": "Pédalo",
-                            "Emplacement": "Mer",
-                            "Nom Client": p['nom'],
-                            "Telephone": "-",
-                            "Détails": f"Pédalo {p['duree']}",
-                            "Consos": "-",
-                            "Total Payé (€)": p['prix']
-                        }
-                        st.session_state.historique_ventes.append(vente_p)
-                        st.session_state.pedalos[idx]['statut'] = "Retourné"
-                        st.success("Pédalo encaissé et archivé !")
-                        st.rerun()
+            # L'ALLÉE CENTRALE (Entre le groupe 5 et 6)
+            st.markdown("<div class='allee-centrale'>🚧 ALLÉE CENTRALE 🚧</div>", unsafe_allow_html=True)
 
-    # ==========================================
-    # ONGLET 3 : FIN DE JOURNÉE & TELECHARGEMENT ARCHIVES
-    # ==========================================
-    elif onglet == "📊 Fin de journée (Archives)":
-        st.subheader("📊 Récapitulatif et Téléchargement des archives")
-        
-        if not st.session_state.historique_ventes:
-            st.info("Aucune vente enregistrée pour le moment aujourd'hui.")
-        else:
-            df_ventes = pd.DataFrame(st.session_state.historique_ventes)
+            # 5 Groupes à DROITE de l'allée
+            cols_droite = st.columns(5)
+            for i, col in enumerate(cols_droite, start=6):
+                id_case = f"L{ligne}-G{i}"
+                info = st.session_state.plage[id_case]
+                
+                if info["statut"] == "Libre":
+                    label = f"🟢 Gp {i}\n(Libre)"
+                    type_bouton = "secondary"
+                else:
+                    label = f"🔴 Gp {i}\n{info['client']}\n({info['heure']})"
+                    type_bouton = "primary"
+                
+                if col.button(label, key=id_case, type=type_bouton):
+                    st.session_state.groupe_selectionne = id_case
             
-            # Calcul du Chiffre d'Affaire de la journée
-            ca_total = df_ventes["Total Payé (€)"].sum()
-            st.metric(label="💰 Chiffre d'Affaires Total Encaissé", value=f"{ca_total:.2f} €")
-            
-            st.write("### 📋 Liste de toutes les ventes du jour :")
-            st.dataframe(df_ventes, use_container_width=True)
+            st.write("") # Espace entre les lignes
+
+        # ==========================================
+        # FENÊTRE DE DIALOGUE (Quand on clique sur une place)
+        # ==========================================
+        if st.session_state.groupe_selectionne:
+            id_sel = st.session_state.groupe_selectionne
+            info_sel = st.session_state.plage[id_sel]
             
             st.write("---")
-            st.markdown("### 📥 ÉTAPE DE SÉCURITÉ POUR LA PATRONNE :")
-            st.write("Avant de fermer le site ce soir, cliquez sur le bouton ci-dessous pour télécharger le fichier Excel de la journée sur votre téléphone :")
+            st.markdown(f"### ⚙️ Gestion du **{id_sel.replace('-', ' ')}**")
             
-            # Transformation en fichier Excel/CSV téléchargeable d'un clic
-            csv = df_ventes.to_csv(index=False).encode('utf-8')
-            nom_fichier = f"archives_plage_{datetime.now().strftime('%Y-%m-%d')}.csv"
-            
-            st.download_button(
-                label="💾 TÉLÉCHARGER LE BILAN DU JOUR (Excel/CSV)",
-                data=csv,
-                file_name=nom_fichier,
-                mime='text/csv',
-                type="primary"
-            )
+            if info_sel["statut"] == "Libre":
+                # Formulaire d'installation rapide
+                with st.form("installation_client"):
+                    nom_c = st.text_input("Nom du client :")
+                    heure_a = st.text_input("Heure d'arrivée :", value=datetime.now().strftime("%H:%M"))
+                    
+                    if st.form_submit_button("✅ Installer"):
+                        if nom_c:
+                            st.session_state.plage[id_sel] = {"statut": "Occupé", "client": nom_c, "heure": heure_a}
+                            st.session_state.groupe_selectionne = None # Ferme la zone de gestion
+                            st.rerun()
+                        else:
+                            st.error("Veuillez entrer un nom.")
+            else:
+                # Si la place est occupée, on affiche les infos et le bouton de libération
+                st.info(f"👤 Client : **{info_sel['client']}** installé à **{info_sel['heure']}**")
+                
+                # Simulation de l'ardoise (on rajoutera les vrais boutons boissons après)
+                st.write("🛒 *Ardoise en cours... (Bientôt les consommations ici)*")
+                
+                if st.button("💵 Encaisser et Libérer la place", type="primary"):
+                    st.session_state.plage[id_sel] = {"statut": "Libre", "client": "", "heure": ""}
+                    st.session_state.groupe_selectionne = None
+                    st.success("Place libérée !")
+                    st.rerun()
+                
+                if st.button("❌ Fermer sans modifier"):
+                    st.session_state.groupe_selectionne = None
+                    st.rerun()
+
+    # --- AUTRES PAGES EN ATTENTE ---
+    elif page == "📅 Réservations":
+        st.info("Page Réservations en cours de préparation...")
+    elif page == "🚣 Pédalos":
+        st.info("Page Pédalos en cours de préparation...")
+    elif page == "📦 Stocks":
+        st.info("Page Stocks en cours de préparation...")
+    elif page == "📊 Chiffre d'Affaires":
+        st.info("Page Chiffre d'Affaires en cours de préparation...")
+    elif page == "📝 Notes (Besoins)":
+        st.info("Page Notes & Besoins en cours de préparation...")
