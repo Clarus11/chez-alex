@@ -11,7 +11,7 @@ st.markdown("""
     div[data-testid="stHorizontalBlock"] {
         display: flex !important;
         flex-wrap: nowrap !important;
-        gap: 3px !important;
+        gap: 2px !important;
         align-items: center !important;
         padding: 0 !important;
     }
@@ -20,7 +20,7 @@ st.markdown("""
     .stButton > button {
         width: 100% !important;
         height: 55px !important;
-        padding: 2px !important;
+        padding: 0px !important;
         font-size: 11px !important;
         line-height: 1.2 !important;
         font-weight: bold !important;
@@ -71,6 +71,10 @@ else:
                 id_case = f"L{ligne}-G{groupe}"
                 st.session_state.plage[id_case] = {"statut": "Libre", "client": "", "heure": ""}
 
+    # --- ENREGISTREMENT DU GROUPE CLIQUÉ ---
+    if "groupe_selectionne" not in st.session_state:
+        st.session_state.groupe_selectionne = None
+
     # --- MENU LATÉRAL ---
     with st.sidebar:
         st.markdown("<h3 style='color: #1e3a8a;'>MENU</h3>", unsafe_allow_html=True)
@@ -93,19 +97,20 @@ else:
             # On crée 11 colonnes réelles côte à côte : 5 places + 1 allée + 5 places
             colonnes = st.columns([1, 1, 1, 1, 1, 0.6, 1, 1, 1, 1, 1])
             
-            # --- Les 5 premiers groupes (Gauche) ---
+            # --- Les 5 premiers groupes (Gauche : 1 à 5) ---
             for i in range(1, 6):
                 id_case = f"L{ligne}-G{i}"
                 info = st.session_state.plage[id_case]
                 
                 if info["statut"] == "Libre":
-                    label = f"🟢<br>Gp {i}"
+                    # Affichage propre demandé : exemple "1-1" pour Ligne 1, Groupe 1
+                    label = f"🟢\n{ligne}-{i}"
                     type_bouton = "secondary"
                 else:
-                    label = f"🔴<br>{info['client']}<br>{info['heure']}"
+                    # Si occupé, on affiche en rouge avec le nom du client
+                    label = f"🔴\n{info['client']}"
                     type_bouton = "primary"
                 
-                # On affiche dans la bonne colonne (0 à 4)
                 if colonnes[i-1].button(label, key=id_case, type=type_bouton):
                     st.session_state.groupe_selectionne = id_case
                     st.rerun()
@@ -114,19 +119,18 @@ else:
             with colonnes[5]:
                 st.markdown("<div class='allee-verticale'>ALLÉE</div>", unsafe_allow_html=True)
 
-            # --- Les 5 derniers groupes (Droite) ---
+            # --- Les 5 derniers groupes (Droite : 6 à 10) ---
             for i in range(6, 11):
                 id_case = f"L{ligne}-G{i}"
                 info = st.session_state.plage[id_case]
                 
                 if info["statut"] == "Libre":
-                    label = f"🟢<br>Gp {i}"
+                    label = f"🟢\n{ligne}-{i}"
                     type_bouton = "secondary"
                 else:
-                    label = f"🔴<br>{info['client']}<br>{info['heure']}"
+                    label = f"🔴\n{info['client']}"
                     type_bouton = "primary"
                 
-                # On affiche dans la bonne colonne (index 6 à 10)
                 if colonnes[i].button(label, key=id_case, type=type_bouton):
                     st.session_state.groupe_selectionne = id_case
                     st.rerun()
@@ -136,18 +140,21 @@ else:
         # ==========================================
         # FENÊTRE POP-UP (MODAL PAR-DESSUS)
         # ==========================================
-        # Grâce à st.dialog, la boîte s'ouvre au milieu de l'écran par-dessus le reste !
         @st.dialog("Détails de l'emplacement")
         def ouvrir_fiche_client(id_sel):
             info_sel = st.session_state.plage[id_sel]
-            st.markdown(f"### ⚙️ Gestion du **{id_sel.replace('L', 'Ligne ').replace('-G', ' - Groupe ')}**")
+            # On extrait le numéro de ligne et de groupe pour le titre de la pop-up
+            partie_ligne = id_sel.split("-")[0].replace("L", "")
+            partie_groupe = id_sel.split("-")[1].replace("G", "")
+            
+            st.markdown(f"### ⚙️ Gestion de l'emplacement **{partie_ligne}-{partie_groupe}**")
             st.write("---")
             
             if info_sel["statut"] == "Libre":
                 nom_c = st.text_input("👤 Nom du client :")
                 heure_a = st.text_input("⏰ Heure d'arrivée :", value=datetime.now().strftime("%H:%M"))
                 
-                if st.form_submit_button if False else st.button("✅ Installer le client", type="primary"):
+                if st.button("✅ Installer le client", type="primary"):
                     if nom_c:
                         st.session_state.plage[id_sel] = {"statut": "Occupé", "client": nom_c, "heure": heure_a}
                         st.session_state.groupe_selectionne = None
@@ -159,10 +166,10 @@ else:
                 st.markdown(f"⏰ **Arrivé à :** {info_sel['heure']}")
                 st.write("---")
                 st.write("🛒 **Ardoise / Consommations :**")
-                st.caption("(Les boutons boissons arriveront ici à la prochaine étape)")
+                st.caption("(Les boutons boissons arriveront ici dès qu'on attaquera la page des stocks)")
                 
                 st.write("---")
-                if st.button("💵 Encaisser et libérer", type="primary"):
+                if st.button("💵 Encaisser et libérer la place", type="primary"):
                     st.session_state.plage[id_sel] = {"statut": "Libre", "client": "", "heure": ""}
                     st.session_state.groupe_selectionne = None
                     st.rerun()
