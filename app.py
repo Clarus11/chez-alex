@@ -2,7 +2,7 @@ import streamlit as st
 from datetime import datetime
 
 # ==========================================
-# 1. CONFIGURATION ET STYLE (PROPRE MOBILE)
+# 1. CONFIGURATION ET STYLE
 # ==========================================
 st.set_page_config(page_title="Chez Alex 2026", page_icon="🏖️", layout="wide")
 
@@ -11,8 +11,42 @@ st.markdown("""
     /* Fond de l'application */
     .stApp { background-color: #fdfaf3; }
     
-    /* Grille des transats responsive et propre */
-    .block-container { padding-top: 2rem !important; }
+    /* Alignement de la grille des transats */
+    div[data-testid="stHorizontalBlock"] {
+        display: flex !important;
+        flex-wrap: nowrap !important;
+        gap: 3px !important;
+        align-items: center !important;
+        padding: 0 !important;
+    }
+    
+    /* Style des boutons transats */
+    .stButton > button {
+        width: 100% !important;
+        height: 55px !important;
+        padding: 0px !important;
+        font-size: 11px !important;
+        line-height: 1.2 !important;
+        font-weight: bold !important;
+        border-radius: 6px !important;
+    }
+    
+    /* Allée centrale compacte */
+    .allee-verticale {
+        background-color: #fef08a;
+        color: #854d0e;
+        font-weight: bold;
+        text-align: center;
+        padding: 10px 1px;
+        border-radius: 4px;
+        font-size: 9px;
+        writing-mode: vertical-lr;
+        transform: rotate(180deg);
+        height: 55px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
     
     /* Blocs financiers */
     .total-display {
@@ -29,7 +63,34 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 # ==========================================
-# 2. SÉCURITÉ D'ACCÈS
+# 2. CALCUL DYNAMIQUE DES TARIFS PAR HEURES
+# ==========================================
+def calculer_tarif_heures(heure_arr, heure_dep, nb_transats):
+    try:
+        t1 = datetime.strptime(heure_arr, "%H:%M")
+        t2 = datetime.strptime(heure_dep, "%H:%M")
+        diff = t2 - t1
+        minutes = diff.total_seconds() / 60
+        if minutes < 0:
+            minutes = 0
+        heures = minutes / 60
+        
+        if heures <= 2.0:
+            prix_u = 7.0
+            libelle = f"Tarif 2h ({prix_u}€ × {nb_transats})"
+        elif heures <= 5.0:
+            prix_u = 12.0
+            libelle = f"Tarif Demi-journée ({prix_u}€ × {nb_transats})"
+        else:
+            prix_u = 15.0
+            libelle = f"Tarif Journée ({prix_u}€ × {nb_transats})"
+            
+        return prix_u * nb_transats, heures, libelle
+    except:
+        return 15.0 * nb_transats, 0.0, "Tarif Journée (Défaut)"
+
+# ==========================================
+# 3. SÉCURITÉ D'ACCÈS
 # ==========================================
 if "autorise" not in st.session_state:
     st.session_state.autorise = False
@@ -49,23 +110,22 @@ if not st.session_state.autorise:
                 st.error("Mot de passe incorrect ❌")
 else:
     # ==========================================
-    # 3. INITIALISATION DES STRUCTURES DE DONNÉES
+    # 4. INITIALISATION DES STRUCTURES DE DONNÉES
     # ==========================================
     if "plage" not in st.session_state:
         st.session_state.plage = {}
 
-    # Initialisation complète sans faille
     for l in range(1, 8):
         for g in range(1, 11):
             id_c = f"L{l}-G{g}"
-            if id_c not in st.session_state.plage:
+            if id_c not in st.session_state.plage or not isinstance(st.session_state.plage[id_c], dict) or "statut" not in st.session_state.plage[id_c]:
                 st.session_state.plage[id_c] = {
-                    "statut": "Libre", "client": "", "nb_transats": 2, "forfait": "Journée (15€)",
-                    "heure_arrivee": "17:05", "fin_prevue": "18:00",
+                    "statut": "Libre", "client": "", "heure_arrivee": "", "nb_transats": 2, 
                     "transats_payes": False, "prix_transats_encaisse": 0.0, "conso_ardoise": 0.0, 
                     "historique_conso": [], "paye_direct": 0.0, "historique_paye_direct": []
                 }
     
+    # Flotte de Pédalos
     if "pedalos" not in st.session_state:
         st.session_state.pedalos = {}
         for p in range(1, 6):
@@ -73,6 +133,7 @@ else:
                 "statut": "Disponible", "client": "", "heure_depart": "", "duree_prevue": "1h", "total_du": 0.0
             }
 
+    # Liste officielle des produits et prix
     TARIFS_CONSO = {
         "Coca-Cola": 2.50, "Coca-Cola Zero": 2.50, "Orangina": 2.50, "Schweppes Agrume": 2.50,
         "Oasis Tropical": 2.50, "Tropico": 2.50, "Fanta Orange": 2.50, "Fanta Citron": 2.50,
@@ -82,25 +143,34 @@ else:
 
     if "ca_jour" not in st.session_state: st.session_state.ca_jour = 0.0
     
+    # Structure de stocks
     if "stocks" not in st.session_state: 
         st.session_state.stocks = {
-            "Boissons & Cafés": 150, "Oranges (Jus)": 40, "Menthe & Citrons (Mojito)": 30, "Glaces Artisanales": 60
+            "Boissons & Cafés": 150, 
+            "Oranges (Jus)": 40, 
+            "Menthe & Citrons (Mojito)": 30, 
+            "Glaces Artisanales": 60
         }
         
     if "notes" not in st.session_state: st.session_state.notes = []
     if "groupe_selectionne" not in st.session_state: st.session_state.groupe_selectionne = None
 
     # ==========================================
-    # 4. NAVIGATION LATÉRALE
+    # 5. NAVIGATION LATÉRALE
     # ==========================================
     with st.sidebar:
-        st.markdown("<h2 style='color: #854d0e; text-align: center;'>MENU</h2>", unsafe_allow_html=True)
-        page = st.radio("Aller à :", [
-            "🏖️ Plan de la plage", "🚣 Pédalos", "📝 Notes (To-Do List)", 
-            "📦 Stocks & Frigos", "📊 Chiffre d'Affaires", "📅 Réservations"
-        ], label_visibility="collapsed")
+        st.markdown("<h2 style='color: #854d0e; text-align: center;'>CHEZ ALEX</h2>", unsafe_allow_html=True)
         st.write("---")
-        if st.button("🔒 Verrouiller"):
+        page = st.radio("Navigation :", [
+            "🏖️ Plan de la plage", 
+            "🚣 Pédalos",
+            "📝 Notes (To-Do List)",
+            "📦 Stocks & Frigos", 
+            "📊 Chiffre d'Affaires",
+            "📅 Réservations"
+        ])
+        st.write("---")
+        if st.button("🔒 Verrouiller l'app"):
             st.session_state.autorise = False
             st.rerun()
 
@@ -108,211 +178,244 @@ else:
     # MODULE : PLAN DE LA PLAGE
     # ==========================================
     if page == "🏖️ Plan de la plage":
-        st.markdown("<h3 style='color: #854d0e; text-align: center;'>🏖️ PLAN DE LA PLAGE</h3>", unsafe_allow_html=True)
-        
-        for l in range(1, 8):
-            st.write(f"**Ligne {l}**")
-            
-            # Côté Gauche (Groupes 1 à 5)
-            cols_gauche = st.columns(5)
-            for idx, g in enumerate(range(1, 6)):
-                id_c = f"L{l}-G{g}"
-                info = st.session_state.plage[id_c]
-                label = f"🟢 Gp {g} (Libre)" if info["statut"] == "Libre" else f"🔴 {info['client']}"
-                if cols_gauche[idx].button(label, key=id_c, use_container_width=True):
-                    st.session_state.groupe_selectionne = id_c
-                    st.rerun()
-            
-            # Allée centrale propre
-            st.markdown("<div style='background-color: #fef08a; color: #854d0e; text-align: center; font-weight: bold; padding: 4px; border-radius: 4px; margin: 4px 0;'>🚧 ALLÉE CENTRALE 🚧</div>", unsafe_allow_html=True)
-            
-            # Côté Droite (Groupes 6 à 10)
-            cols_droite = st.columns(5)
-            for idx, g in enumerate(range(6, 11)):
-                id_c = f"L{l}-G{g}"
-                info = st.session_state.plage[id_c]
-                label = f"🟢 Gp {g} (Libre)" if info["statut"] == "Libre" else f"🔴 {info['client']}"
-                if cols_droite[idx].button(label, key=id_c, use_container_width=True):
-                    st.session_state.groupe_selectionne = id_c
-                    st.rerun()
-            st.write("---")
+        st.markdown("<h3 style='color: #854d0e; text-align: center;'>PLAN DU JOUR</h3>", unsafe_allow_html=True)
+        st.write("")
 
-        # Fenêtre de gestion
+        for l in range(1, 8):
+            st.caption(f"Ligne {l}")
+            cols = st.columns([1, 1, 1, 1, 1, 0.4, 1, 1, 1, 1, 1])
+            
+            for g in range(1, 6):
+                id_c = f"L{l}-G{g}"
+                info = st.session_state.plage[id_c]
+                label = f"🟢\n{l}-{g}" if info.get("statut", "Libre") == "Libre" else f"🔴\n{info.get('client', 'Occupé')}"
+                if cols[g-1].button(label, key=id_c, type="secondary" if info.get("statut", "Libre") == "Libre" else "primary"):
+                    st.session_state.groupe_selectionne = id_c
+                    st.rerun()
+
+            with cols[5]: st.markdown("<div class='allee-verticale'>ALLÉE</div>", unsafe_allow_html=True)
+
+            for g in range(6, 11):
+                id_c = f"L{l}-G{g}"
+                info = st.session_state.plage[id_c]
+                label = f"🟢\n{l}-{g}" if info.get("statut", "Libre") == "Libre" else f"🔴\n{info.get('client', 'Occupé')}"
+                if cols[g].button(label, key=id_c, type="secondary" if info.get("statut", "Libre") == "Libre" else "primary"):
+                    st.session_state.groupe_selectionne = id_c
+                    st.rerun()
+
         if st.session_state.groupe_selectionne:
             @st.dialog("Gestion de l'emplacement")
             def gerer_place(id_sel):
+                # Réparation invisible des vieux caches pour éviter l'erreur KeyError
+                if "historique_conso" not in st.session_state.plage[id_sel]:
+                    st.session_state.plage[id_sel]["historique_conso"] = []
+                if "historique_paye_direct" not in st.session_state.plage[id_sel]:
+                    st.session_state.plage[id_sel]["historique_paye_direct"] = []
+                if "paye_direct" not in st.session_state.plage[id_sel]:
+                    st.session_state.plage[id_sel]["paye_direct"] = 0.0
+                if "conso_ardoise" not in st.session_state.plage[id_sel]:
+                    st.session_state.plage[id_sel]["conso_ardoise"] = 0.0
+                
                 info = st.session_state.plage[id_sel]
                 num_l, num_g = id_sel.replace("L","").split("-G")
-                st.markdown(f"### Emplacement {num_l}-{num_g}")
+                st.markdown(f"#### Emplacement **{num_l}-{num_g}**")
                 
                 if info["statut"] == "Libre":
                     nom = st.text_input("👤 Nom du client :")
-                    nb_t = st.number_input("🪑 Nombre de transats :", min_value=1, max_value=10, value=2)
+                    nb_t = st.number_input("🪑 Nombre de transats :", min_value=1, max_value=4, value=2)
+                    h_a = st.text_input("⏰ Heure d'arrivée :", datetime.now().strftime("%H:%M"))
                     
-                    forfait = st.radio("💰 Forfait choisi :", [
-                        "Journée (15€)", "Demi-journée (12€)", "2 heures (7€)"
-                    ])
-                    
-                    col_h1, col_h2 = st.columns(2)
-                    h_a = col_h1.text_input("⏰ Arrivée :", datetime.now().strftime("%H:%M"))
-                    h_f = col_h2.text_input("⏳ Fin prévue :", "18:00")
-                    
-                    if st.button("✅ Installer le client", type="primary", use_container_width=True):
+                    if st.button("✅ Installer le client", type="primary"):
                         if nom:
                             st.session_state.plage[id_sel].update({
-                                "statut": "Occupé", "client": nom, "nb_transats": nb_t, "forfait": forfait,
-                                "heure_arrivee": h_a, "fin_prevue": h_f
+                                "statut": "Occupé", "client": nom, "nb_transats": nb_t, "heure_arrivee": h_a,
+                                "transats_payes": False, "prix_transats_encaisse": 0.0, "conso_ardoise": 0.0,
+                                "historique_conso": [], "paye_direct": 0.0, "historique_paye_direct": []
                             })
                             st.session_state.groupe_selectionne = None
                             st.rerun()
                         else:
-                            st.error("Le nom du client est obligatoire.")
+                            st.error("Nom obligatoire.")
+
                 else:
-                    # Client déjà installé
-                    st.markdown(f"👤 **Client :** {info['client']}")
-                    st.markdown(f"🪑 **Transats :** {info['nb_transats']} | 📦 **Forfait :** {info['forfait']}")
-                    st.markdown(f"⏰ **Arrivée :** {info['heure_arrivee']} | ⏳ **Fin prévue :** {info['fin_prevue']}")
+                    st.markdown(f"👤 **{info['client']}** | 🪑 {info['nb_transats']} transats | ⏰ Arrivée : {info['heure_arrivee']}")
+                    h_actuelle = datetime.now().strftime("%H:%M")
+                    h_dep = st.text_input("⏳ Heure de départ / calcul :", h_actuelle)
                     
-                    # Détermination du tarif unitaire selon le forfait choisi à l'installation
-                    if "2 heures" in info["forfait"]:
-                        prix_unitaire_t = 7.0
-                    elif "Demi-journée" in info["forfait"]:
-                        prix_unitaire_t = 12.0
-                    else:
-                        prix_unitaire_t = 15.0
-                        
-                    frais_transats = prix_unitaire_t * info["nb_transats"]
+                    frais_transats, heures_passees, libelle_tarif = calculer_tarif_heures(info["heure_arrivee"], h_dep, info["nb_transats"])
+                    st.markdown(f"⏱️ *Temps : {heures_passees:.2f}h* — **{libelle_tarif}**")
                     
                     st.write("---")
                     st.write("💰 **Règlement des Transats :**")
-                    if not info["transats_payes"]:
-                        st.warning(f"Montant dû pour les transats : {frais_transats:.2f} €")
-                        if st.button("💵 Encaisser les transats DIRECT", use_container_width=True):
+                    if not info.get("transats_payes", False):
+                        st.warning(f"Montant dû : {frais_transats:.2f} €")
+                        if st.button("💵 Encaisser les transats DIRECT (Sur le transat)"):
                             st.session_state.ca_jour += frais_transats
                             st.session_state.plage[id_sel]["transats_payes"] = True
                             st.session_state.plage[id_sel]["prix_transats_encaisse"] = frais_transats
                             st.rerun()
                     else:
-                        st.success(f"✅ Transats réglés ({info['prix_transats_encaisse']:.2f} €)")
+                        st.success(f"✅ Transats réglés en direct ({info.get('prix_transats_encaisse', 0.0):.2f} €)")
 
                     st.write("---")
                     st.write("🛒 **Ajouter une Consommation :**")
-                    produit_choisi = st.selectbox("Article :", list(TARIFS_CONSO.keys()))
-                    prix_unitaire_c = TARIFS_CONSO[produit_choisi]
                     
-                    if produit_choisi == "Jus Orange Pressé": cat_stock = "Oranges (Jus)"
-                    elif produit_choisi == "Virgin Mojito": cat_stock = "Menthe & Citrons (Mojito)"
-                    elif produit_choisi == "Glace Artisanale": cat_stock = "Glaces Artisanales"
-                    else: cat_stock = "Boissons & Cafés"
+                    # Sélection du produit
+                    produit_choisi = st.selectbox("Choisir l'article :", list(TARIFS_CONSO.keys()))
+                    prix_unitaire = TARIFS_CONSO[produit_choisi]
+                    st.info(f"Prix unitaire : {prix_unitaire:.2f} €")
+                    
+                    # Détermination de la catégorie de stock associée
+                    if produit_choisi == "Jus Orange Pressé":
+                        cat_stock = "Oranges (Jus)"
+                    elif produit_choisi == "Virgin Mojito":
+                        cat_stock = "Menthe & Citrons (Mojito)"
+                    elif produit_choisi == "Glace Artisanale":
+                        cat_stock = "Glaces Artisanales"
+                    else:
+                        cat_stock = "Boissons & Cafés"
 
-                    c_btn1, c_btn2 = st.columns(2)
-                    if c_btn1.button("➕ Ardoise", use_container_width=True):
-                        st.session_state.plage[id_sel]["conso_ardoise"] += prix_unitaire_c
-                        st.session_state.plage[id_sel]["historique_conso"].append(f"{produit_choisi} ({prix_unitaire_c:.2f}€)")
-                        st.session_state.stocks[cat_stock] -= 1
-                        st.rerun()
-                    if c_btn2.button("⚡ Direct", use_container_width=True, type="primary"):
-                        st.session_state.ca_jour += prix_unitaire_c
-                        st.session_state.plage[id_sel]["paye_direct"] += prix_unitaire_c
-                        st.session_state.plage[id_sel]["historique_paye_direct"].append(f"{produit_choisi} ({prix_unitaire_c:.2f}€)")
-                        st.session_state.stocks[cat_stock] -= 1
-                        st.rerun()
+                    col_btn_ard, col_btn_dir = st.columns(2)
+                    
+                    with col_btn_ard:
+                        if st.button("➕ Ajouter à l'Ardoise", use_container_width=True):
+                            st.session_state.plage[id_sel]["conso_ardoise"] += prix_unitaire
+                            st.session_state.plage[id_sel]["historique_conso"].append(f"{produit_choisi} (Ardoise)")
+                            st.session_state.stocks[cat_stock] -= 1
+                            st.rerun()
+                            
+                    with col_btn_dir:
+                        if st.button("⚡ Encaisser Direct", use_container_width=True, type="primary"):
+                            st.session_state.ca_jour += prix_unitaire
+                            st.session_state.plage[id_sel]["paye_direct"] += prix_unitaire
+                            st.session_state.plage[id_sel]["historique_paye_direct"].append(f"{produit_choisi} (Direct)")
+                            st.session_state.stocks[cat_stock] -= 1
+                            st.rerun()
 
-                    if info["historique_conso"] or info["historique_paye_direct"]:
-                        with st.expander("Détail des consommations"):
-                            if info["historique_conso"]:
+                    # Résumé des consos sur la fiche
+                    if info.get("historique_conso") or info.get("historique_paye_direct"):
+                        with st.expander("👀 Voir le détail des consos"):
+                            if info.get("historique_conso"):
                                 st.write("**Sur l'Ardoise :**")
                                 for c in info["historique_conso"]: st.text(f" ⏳ {c}")
-                            if info["historique_paye_direct"]:
-                                st.write("**Payé en direct :**")
+                            if info.get("historique_paye_direct"):
+                                st.write("**Déjà payé en direct :**")
                                 for c in info["historique_paye_direct"]: st.text(f" ✅ {c}")
 
                     st.write("---")
-                    transats_dus = 0.0 if info["transats_payes"] else frais_transats
-                    total_du_final = transats_dus + info["conso_ardoise"]
+                    transats_dus = 0.0 if info.get("transats_payes", False) else frais_transats
+                    total_du_final = transats_dus + info.get("conso_ardoise", 0.0)
                     
-                    st.markdown(f"<div class='paye-direct-display'>DÉJÀ ENCAISSÉ : {info['paye_direct'] + info['prix_transats_encaisse']:.2f} €</div>", unsafe_allow_html=True)
-                    st.markdown(f"<div class='total-display'>RESTE À PAYER : {total_du_final:.2f} €</div>", unsafe_allow_html=True)
+                    st.markdown(f"<div class='paye-direct-display'>DÉJÀ ENCAISSÉ EN DIRECT : {info.get('paye_direct', 0.0) + info.get('prix_transats_encaisse', 0.0):.2f} €</div>", unsafe_allow_html=True)
+                    st.markdown(f"<div class='total-display'>RESTE À PAYER AU DÉPART : {total_du_final:.2f} €</div>", unsafe_allow_html=True)
                     
-                    f_btn1, f_btn2 = st.columns(2)
-                    if f_btn1.button("💵 TOUT ENCAISSER & LIBÉRER", type="primary", use_container_width=True):
+                    col_f1, col_f2 = st.columns(2)
+                    if col_f1.button("💵 ENCAISSER RESTE & LIBÉRER", type="primary"):
                         st.session_state.ca_jour += total_du_final
                         st.session_state.plage[id_sel] = {
-                            "statut": "Libre", "client": "", "nb_transats": 2, "forfait": "Journée (15€)",
-                            "heure_arrivee": "17:05", "fin_prevue": "18:00",
+                            "statut": "Libre", "client": "", "heure_arrivee": "", "nb_transats": 2, 
                             "transats_payes": False, "prix_transats_encaisse": 0.0, "conso_ardoise": 0.0, 
                             "historique_conso": [], "paye_direct": 0.0, "historique_paye_direct": []
                         }
                         st.session_state.groupe_selectionne = None
                         st.rerun()
-                    if f_btn2.button("Fermer", use_container_width=True):
+                    if col_f2.button("Fermer"):
                         st.session_state.groupe_selectionne = None
                         st.rerun()
 
             gerer_place(st.session_state.groupe_selectionne)
 
     # ==========================================
-    # MODULE : PÉDALOS
+    # MODULE : PÉDALOS (20€/h)
     # ==========================================
     elif page == "🚣 Pédalos":
-        st.markdown("<h3 style='text-align: center; color: #854d0e;'>🚣 FLOTTE DE PÉDALOS</h3>", unsafe_allow_html=True)
+        st.markdown("<h3 style='text-align: center; color: #854d0e;'>🚣 GESTION DE LA FLOTTE DE PÉDALOS</h3>", unsafe_allow_html=True)
+        st.write("Suivi des départs en mer et encaissement instantané.")
+        st.write("---")
+        
         for p_id, p_info in st.session_state.pedalos.items():
             with st.container(border=True):
                 col_p1, col_p2, col_p3 = st.columns([2, 4, 3])
+                
                 with col_p1:
-                    st.markdown(f"### {p_id}")
-                    if p_info["statut"] == "Disponible": st.success("Disponible")
-                    else: st.error("En Mer")
+                    if p_info["statut"] == "Disponible":
+                        st.markdown(f"### 🔵 {p_id}")
+                        st.success("Disponible")
+                    else:
+                        st.markdown(f"### 🚣 {p_id}")
+                        st.error("En Mer")
+                        
                 with col_p2:
                     if p_info["statut"] == "Disponible":
-                        nom_p = st.text_input("Client :", key=f"nom_{p_id}")
-                        duree_p = st.radio("Durée :", ["30 min (15€)", "1h (20€)"], key=f"dur_{p_id}", horizontal=True)
-                        h_dep_p = st.text_input("Départ :", datetime.now().strftime("%H:%M"), key=f"hdep_{p_id}")
+                        nom_p = st.text_input("Nom du client :", key=f"nom_{p_id}", placeholder="Ex: Lucas")
+                        duree_p = st.radio("Durée demandée :", ["30 min (15€)", "1h (20€)"], key=f"dur_{p_id}", horizontal=True)
+                        h_dep_p = st.text_input("Heure de départ :", datetime.now().strftime("%H:%M"), key=f"hdep_{p_id}")
                     else:
                         st.markdown(f"👤 **Client :** {p_info['client']}")
                         st.markdown(f"⏰ **Départ :** {p_info['heure_depart']} | **Forfait :** {p_info['duree_prevue']}")
-                        st.markdown(f"💰 **À régler :** {p_info['total_du']:.2f} €")
+                        st.markdown(f"💰 **Montant à régler :** {p_info['total_du']:.2f} €")
+                        
                 with col_p3:
+                    st.write("")
                     if p_info["statut"] == "Disponible":
-                        if st.button("🚀 Lancer", key=f"btn_l_{p_id}", type="primary", use_container_width=True):
+                        if st.button("🚀 Mettre à l'eau", key=f"btn_l_{p_id}", type="primary", use_container_width=True):
                             if nom_p:
                                 prix_p = 15.0 if "30 min" in duree_p else 20.0
-                                st.session_state.pedalos[p_id].update({"statut": "En Mer", "client": nom_p, "heure_depart": h_dep_p, "duree_prevue": duree_p, "total_du": prix_p})
+                                st.session_state.pedalos[p_id].update({
+                                    "statut": "En Mer", "client": nom_p, "heure_depart": h_dep_p, "duree_prevue": duree_p, "total_du": prix_p
+                                })
                                 st.rerun()
+                            else:
+                                st.error("Entrez un nom")
                     else:
-                        if st.button("💵 Retour", key=f"btn_r_{p_id}", type="primary", use_container_width=True):
+                        if st.button("💵 Retour & Encaisser", key=f"btn_r_{p_id}", type="primary", use_container_width=True):
                             st.session_state.ca_jour += p_info["total_du"]
-                            st.session_state.pedalos[p_id].update({"statut": "Disponible", "client": "", "heure_depart": "", "duree_prevue": "1h", "total_du": 0.0})
+                            st.session_state.pedalos[p_id].update({
+                                "statut": "Disponible", "client": "", "heure_depart": "", "duree_prevue": "1h", "total_du": 0.0
+                            })
                             st.rerun()
 
     # ==========================================
-    # MODULES COMPLÉMENTAIRES (STOCKS, CA, ETC.)
+    # MODULE : NOTES (TO-DO LIST)
     # ==========================================
     elif page == "📝 Notes (To-Do List)":
-        st.markdown("<h3 style='color: #854d0e;'>📝 Cahier de Liaison</h3>", unsafe_allow_html=True)
+        st.markdown("<h3 style='color: #854d0e;'>📝 Cahier de Liaison & Besoins</h3>", unsafe_allow_html=True)
         col_note, col_btn = st.columns([4, 1])
-        nouvelle_note = col_note.text_input("Tâche :")
-        if col_btn.button("Ajouter") and nouvelle_note:
-            st.session_state.notes.append(nouvelle_note)
-            st.rerun()
+        nouvelle_note = col_note.text_input("Nouvelle tâche :", placeholder="Ex: Nettoyer la ligne 3")
+        if col_btn.button("Ajouter"):
+            if nouvelle_note:
+                st.session_state.notes.append(nouvelle_note)
+                st.rerun()
         st.write("---")
+        notes_a_supprimer = []
         for i, note in enumerate(st.session_state.notes):
             if st.checkbox(note, key=f"note_{i}"):
-                st.session_state.notes.pop(i)
-                st.rerun()
+                notes_a_supprimer.append(i)
+        if notes_a_supprimer:
+            for i in reversed(notes_a_supprimer): st.session_state.notes.pop(i)
+            st.rerun()
 
+    # ==========================================
+    # MODULE : STOCKS & FRIGOS
+    # ==========================================
     elif page == "📦 Stocks & Frigos":
         st.markdown("<h3 style='color: #854d0e;'>📦 État des Stocks</h3>", unsafe_allow_html=True)
         c1, c2, c3, c4 = st.columns(4)
-        c1.metric("🥤 Canettes & Cafés", f"{st.session_state.stocks.get('Boissons & Cafés', 0)} u")
-        c2.metric("🍊 Stock Oranges", f"{st.session_state.stocks.get('Oranges (Jus)', 0)} u")
-        c3.metric("🍃 Menthe & Citrons", f"{st.session_state.stocks.get('Menthe & Citrons (Mojito)', 0)} u")
-        c4.metric("🍦 Glaces Artisanales", f"{st.session_state.stocks.get('Glaces Artisanales', 0)} u")
+        c1.metric("🥤 Canettes & Cafés", f"{st.session_state.stocks['Boissons & Cafés']} u")
+        c2.metric("🍊 Stock Oranges", f"{st.session_state.stocks['Oranges (Jus)']} u")
+        c3.metric("🍃 Menthe & Citrons", f"{st.session_state.stocks['Menthe & Citrons (Mojito)']} u")
+        c4.metric("🍦 Glaces Artisanales", f"{st.session_state.stocks['Glaces Artisanales']} u")
 
+    # ==========================================
+    # MODULE : CHIFFRE D'AFFAIRES
+    # ==========================================
     elif page == "📊 Chiffre d'Affaires":
         st.markdown("<h3 style='color: #854d0e;'>📊 Caisse du Jour</h3>", unsafe_allow_html=True)
-        st.metric("Total Encaissé", f"{st.session_state.ca_jour:.2f} €")
+        st.metric("Total Encaissé Aujourd'hui", f"{st.session_state.ca_jour:.2f} €")
 
+    # ==========================================
+    # MODULE : RÉSERVATIONS
+    # ==========================================
     elif page == "📅 Réservations":
-        st.markdown("<h3 style='color: #854d0e;'>📅 Réservations</h3>", unsafe_allow_html=True)
-        st.warning("Prêt pour l'étape suivante !")
+        st.markdown(f"<h3 style='color: #854d0e;'>{page}</h3>", unsafe_allow_html=True)
+        st.warning("Prêt pour la suite !")
