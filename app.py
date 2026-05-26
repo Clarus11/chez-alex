@@ -11,41 +11,35 @@ st.markdown("""
     /* Fond de l'application */
     .stApp { background-color: #fdfaf3; }
     
-    /* Alignement de la grille des transats */
+    /* Alignement vertical compact pour mobile */
     div[data-testid="stHorizontalBlock"] {
         display: flex !important;
-        flex-wrap: nowrap !important;
-        gap: 3px !important;
-        align-items: center !important;
+        flex-direction: column !important;
+        gap: 6px !important;
         padding: 0 !important;
     }
     
     /* Style des boutons transats */
     .stButton > button {
         width: 100% !important;
-        height: 55px !important;
+        height: 50px !important;
         padding: 0px !important;
-        font-size: 11px !important;
-        line-height: 1.2 !important;
+        font-size: 14px !important;
         font-weight: bold !important;
-        border-radius: 6px !important;
+        border-radius: 8px !important;
     }
     
-    /* Allée centrale compacte */
-    .allee-verticale {
+    /* Bandeau Allée Centrale */
+    .allee-centrale {
         background-color: #fef08a;
         color: #854d0e;
         font-weight: bold;
         text-align: center;
-        padding: 10px 1px;
-        border-radius: 4px;
-        font-size: 9px;
-        writing-mode: vertical-lr;
-        transform: rotate(180deg);
-        height: 55px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
+        padding: 8px 0px;
+        border-radius: 6px;
+        font-size: 14px;
+        margin: 5px 0px;
+        letter-spacing: 1px;
     }
     
     /* Blocs financiers */
@@ -115,6 +109,7 @@ else:
     if "plage" not in st.session_state:
         st.session_state.plage = {}
 
+    # Initialisation ou réparation complète de chaque emplacement pour éviter les KeyError
     for l in range(1, 8):
         for g in range(1, 11):
             id_c = f"L{l}-G{g}"
@@ -133,7 +128,7 @@ else:
                 "statut": "Disponible", "client": "", "heure_depart": "", "duree_prevue": "1h", "total_du": 0.0
             }
 
-    # Liste officielle des produits et prix
+    # Tarifs officiels mis à jour
     TARIFS_CONSO = {
         "Coca-Cola": 2.50,
         "Coca-Cola Zero": 2.50,
@@ -153,7 +148,6 @@ else:
 
     if "ca_jour" not in st.session_state: st.session_state.ca_jour = 0.0
     
-    # Structure de stocks adaptée aux nouveaux produits
     if "stocks" not in st.session_state: 
         st.session_state.stocks = {
             "Boissons & Cafés": 150, 
@@ -192,8 +186,16 @@ else:
         st.write("")
 
         for l in range(1, 8):
-            st.caption(f"Ligne {l}")
-            cols = st.columns([1, 1, 1, 1, 1, 0.4, 1, 1, 1, 1, 1])
+            st.markdown(f"**Ligne {l}**")
             
+            # Groupes 1 à 5
             for g in range(1, 6):
-                id_c = f"L{l}-
+                id_c = f"L{l}-G{g}"
+                info = st.session_state.plage[id_c]
+                statut_actuel = info.get("statut", "Libre")
+                
+                if statut_actuel == "Libre":
+                    label = f"🟢 Gp {g} (Libre)"
+                    type_btn = "secondary"
+                else:
+                    label = f"🔴 {info.get('
