@@ -71,44 +71,52 @@ from streamlit_gsheets import GSheetsConnection
 # ... (ton début de code reste identique) ...
 
 try:
-    # 1. On récupère les secrets configurés sur Streamlit
+    # 1. On récupère le dictionnaire de base depuis les secrets Streamlit
     secrets_dict = st.secrets["connections"]["gsheets"].to_dict()
     
-    # 2. On injecte proprement la clé privée directement via Python
-    # Cela évite les bugs de lecture du fichier secrets.toml de Streamlit
-    secrets_dict["private_key"] = "-----BEGIN PRIVATE KEY-----\n" \
-        "MIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQCcaABKIBthuP5l\n" \
-        "Nlp1i0NBJPGQGdYdqOmAPh3m3B+903TZRP0PgKbfhTa5Nrod+UNEcZgcvev033Pk\n" \
-        "MELUB5uDXmKfTPnim5qkzCKgcyRhajTxu8ZZGSJnbZR4DNxVi+Y5x6y+Yw72zGLv\n" \
-        "eAT83/47eg1Tq9RmLUaPIkwQs01m/e3gmaCYzdDWPP6YJsfK3GUrq9rjZNCPKAEM\n" \
-        "dgR5gXGtwJtOWXoBoF8tWLKJ/0KPjlhaRP4fGN9BBwBbKDUSJYMklJ+toh2rdgP0\n" \
-        "YAuzPUATM8q6XiUyeEBfkY1Br5ISsep++Rlfiz0sZ0YiU7FipRKo3DkccFDfb/ZH\n" \
-        "NjDU4/vHAgMBAAECggEAChKGhj+IE+SCeYklDTHRPHZBGjsXt2RD2U7mxRHC94oR\n" \
-        "GdbgByoNVRKyof3cwYZmZxd7qMowUl47i+Pxwc7VnIGtDz45T3ce3+MHjdasbpuU\n" \
-        "2kZx8RX1ybxcVdjaLaYrRuhNfxtJAOrLqklL5O8V48Wp6wwDSys6Qoh+Zortfqbc\n" \
-        "7oTCiY+7hDw5rjgM+RkWZ+eXYNGyeEuUfA2CXMrhi/hSubBLSZJnVQoEypW5y7/N\n" \
-        "ucx5GfHV/XeI2AAQMiRV6m24tiEBn0ejYoQTZzaom9kJuSn8C+52pffV+OvQmyCC\n" \
-        "hr43dtjdl7V9oEKCLGg5y1kshjCgcnL3ztqowB9qbQKBgQDLo9f6Hkt92E8Hrjrp\n" \
-        "67KcksG8KTYRyiIoAp1YINZJXRfYJaa8rvNUCUPPqPjG3Z915NdFQUmGdFlCEMK/\n" \
-        "XJshCkzg5sR/pi9svy2Yq6GlLPaIcXuNYx37yvrLB95gbm2XMYAgovbRTPAP8zf5\n" \
-        "NHuhVekCxTFnOxoy3Tm7reHIDQKBgQDEnxlbH7h0iWymfKKNR+H3XSNNQZAcg7fl\n" \
-        "sUIZW5h8LnT69kqnnbn/3MJAljRoQZdzNXRW+N3RPp6+C752B8IfdKZcT3NVCKBa\n" \
-        "HhbizUCxKOwJKh6pCpz8KTKmKB5RGHJx+rj7V0tGBNMtONXgtDApzkQqdd432old\n" \
-        "w8oykKGqIwKBgA7TH676s542uBIkEe/jk74oROhQy7nh0Di/b/rxcQgoOcsneorz\n" \
-        "5Yzxm7krYOkBS1GG1lEZXqPmJnVTyQmrUTPHjy80PYvZakxtYoFhxUPEETJ/qHHz\n" \
-        "jEQ/U6CiMwMsJthB50T4+CTmh/dxSlrfAj0NhwgHmQAd4ltflYtfLjelAoGARA8C\n" \
-        "Ot2O/p+3ASXxKlAwcmxF1O8V0Bjxpc6mn5pp/Moj6d6o1r4s7NjgUHTtrQzPPKzL\n" \
-        "GXPJbC1ty0DLa5Wh5zt8fkVuGYgD4U27BESh2PDeSwnOVRr8XfhwtLz8SXvZ2YQ8\n" \
-        "1ZtQzerLokKjHcWhSkdApyXnhpPZqqAj9D7GBtsCgYB3lLpiiOtaywCHWveTs2SZ\n" \
-        "EX9cR8DFBFwq/LlDVUklSAgLJTaSwGvazUnCcA7Q5X5+7jGiXumi/sufSD0wklFh\n" \
-        "ex3/ZWZSQfCJ1pqFlNFx9mzDylNzemLq1mohzZALfNi9o7+LWdhxnFXkrpW/Avxd\n" \
-        "MMetrBtCuvj6+mKn1VLSQ==\n" \
-        "-----END PRIVATE KEY-----\n"
+    # 2. On reconstruit proprement la clé privée avec des sauts de ligne corrects
+    cle_formattee = "-----BEGIN PRIVATE KEY-----\n" \
+                    "MIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQCcaABKIBthuP5l\n" \
+                    "Nlp1i0NBJPGQGdYdqOmAPh3m3B+903TZRP0PgKbfhTa5Nrod+UNEcZgcvev033Pk\n" \
+                    "MELUB5uDXmKfTPnim5qkzCKgcyRhajTxu8ZZGSJnbZR4DNxVi+Y5x6y+Yw72zGLv\n" \
+                    "eAT83/47eg1Tq9RmLUaPIkwQs01m/e3gmaCYzdDWPP6YJsfK3GUrq9rjZNCPKAEM\n" \
+                    "dgR5gXGtwJtOWXoBoF8tWLKJ/0KPjlhaRP4fGN9BBwBbKDUSJYMklJ+toh2rdgP0\n" \
+                    "YAuzPUATM8q6XiUyeEBfkY1Br5ISsep++Rlfiz0sZ0YiU7FipRKo3DkccFDfb/ZH\n" \
+                    "NjDU4/vHAgMBAAECggEAChKGhj+IE+SCeYklDTHRPHZBGjsXt2RD2U7mxRHC94oR\n" \
+                    "GdbgByoNVRKyof3cwYZmZxd7qMowUl47i+Pxwc7VnIGtDz45T3ce3+MHjdasbpuU\n" \
+                    "2kZx8RX1ybxcVdjaLaYrRuhNfxtJAOrLqklL5O8V48Wp6wwDSys6Qoh+Zortfqbc\n" \
+                    "7oTCiY+7hDw5rjgM+RkWZ+eXYNGyeEuUfA2CXMrhi/hSubBLSZJnVQoEypW5y7/N\n" \
+                    "ucx5GfHV/XeI2AAQMiRV6m24tiEBn0ejYoQTZzaom9kJuSn8C+52pffV+OvQmyCC\n" \
+                    "hr43dtjdl7V9oEKCLGg5y1kshjCgcnL3ztqowB9qbQKBgQDLo9f6Hkt92E8Hrjrp\n" \
+                    "67KcksG8KTYRyiIoAp1YINZJXRfYJaa8rvNUCUPPqPjG3Z915NdFQUmGdFlCEMK/\n" \
+                    "XJshCkzg5sR/pi9svy2Yq6GlLPaIcXuNYx37yvrLB95gbm2XMYAgovbRTPAP8zf5\n" \
+                    "NHuhVekCxTFnOxoy3Tm7reHIDQKBgQDEnxlbH7h0iWymfKKNR+H3XSNNQZAcg7fl\n" \
+                    "sUIZW5h8LnT69kqnnbn/3MJAljRoQZdzNXRW+N3RPp6+C752B8IfdKZcT3NVCKBa\n" \
+                    "HhbizUCxKOwJKh6pCpz8KTKmKB5RGHJx+rj7V0tGBNMtONXgtDApzkQqdd432old\n" \
+                    "w8oykKGqIwKBgA7TH676s542uBIkEe/jk74oROhQy7nh0Di/b/rxcQgoOcsneorz\n" \
+                    "5Yzxm7krYOkBS1GG1lEZXqPmJnVTyQmrUTPHjy80PYvZakxtYoFhxUPEETJ/qHHz\n" \
+                    "jEQ/U6CiMwMsJthB50T4+CTmh/dxSlrfAj0NhwgHmQAd4ltflYtfLjelAoGARA8C\n" \
+                    "Ot2O/p+3ASXxKlAwcmxF1O8V0Bjxpc6mn5pp/Moj6d6o1r4s7NjgUHTtrQzPPKzL\n" \
+                    "GXPJbC1ty0DLa5Wh5zt8fkVuGYgD4U27BESh2PDeSwnOVRr8XfhwtLz8SXvZ2YQ8\n" \
+                    "1ZtQzerLokKjHcWhSkdApyXnhpPZqqAj9D7GBtsCgYB3lLpiiOtaywCHWveTs2SZ\n" \
+                    "EX9cR8DFBFwq/LlDVUklSAgLJTaSwGvazUnCcA7Q5X5+7jGiXumi/sufSD0wklFh\n" \
+                    "ex3/ZWZSQfCJ1pqFlNFx9mzDylNzemLq1mohzZALfNi9o7+LWdhxnFXkrpW/Avxd\n" \
+                    "MMetrBtCuvj6+mKn1VLSQ==\n" \
+                    "-----END PRIVATE KEY-----\n"
 
-    # 3. On force la connexion avec ce dictionnaire corrigé
-    conn = st.connection("gsheets", type=GSheetsConnection, **secrets_dict)
+    # 3. On injecte la clé directement dans le dictionnaire des secrets
+    secrets_dict["private_key"] = cle_formattee
+
+    # 4. On initialise la connexion gsheets en lui passant explicitement 
+    # la clé privée via l'argument attendu par Streamlit
+    conn = st.connection(
+        "gsheets",
+        type=GSheetsConnection,
+        private_key=cle_formattee,
+        **secrets_dict
+    )
     
-    # 4. On charge les données de l'onglet de ta plage
+    # 5. On charge les données de l'onglet de ton projet
     data_plage = conn.read(worksheet="plage")
     st.sidebar.success("✅ Connecté à Google Sheets !")
     
