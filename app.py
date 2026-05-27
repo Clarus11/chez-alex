@@ -75,7 +75,7 @@ st.markdown("""
 # ==========================================
 ID_CIBLE = "1hp2tK4WcDJcWv9ww1ZIuod-nwz8ywaGiNBiSPlYylzE"
 
-conn = st.connection("gsheets", type=GSheetsConnection)
+conn.read = st.connection("gsheets", type=GSheetsConnection)
 
 # On tente de lire avec l'ID
 data_plage = conn.read(spreadsheet=ID_CIBLE, worksheet="plage")
