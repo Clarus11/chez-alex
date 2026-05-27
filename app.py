@@ -426,17 +426,54 @@ else:
             for i in reversed(notes_a_supprimer): st.session_state.notes.pop(i)
             st.rerun()
 
-    # ==========================================
-    # MODULE : STOCKS & FRIGOS
-    # ==========================================
-    elif page == "📦 Stocks & Frigos":
-        st.markdown("<h3 style='color: #854d0e;'>📦 État des Stocks</h3>", unsafe_allow_html=True)
-        c1, c2, c3, c4 = st.columns(4)
-        c1.metric("🥤 Canettes & Cafés", f"{st.session_state.stocks['Boissons & Cafés']} u")
-        c2.metric("🍊 Stock Oranges", f"{st.session_state.stocks['Oranges (Jus)']} u")
-        c3.metric("🍃 Menthe & Citrons", f"{st.session_state.stocks['Menthe & Citrons (Mojito)']} u")
-        c4.metric("🍦 Glaces Artisanales", f"{st.session_state.stocks['Glaces Artisanales']} u")
+   # ==========================================
+# MODULE : GESTION DES STOCKS
+# ==========================================
+elif page == "📦 Stocks & Frigos":
+    st.markdown("<h3 style='color: #854d0e; text-align: center;'>📦 GESTION DES STOCKS & FRIGOS</h3>", unsafe_allow_html=True)
+    st.write("---")
 
+    st.info("💡 Cet onglet sert uniquement à enregistrer les livraisons (Réassort). Les stocks diminuent automatiquement à chaque vente sur le plan de la plage.")
+
+    # On crée une jolie entête de tableau
+    col_h1, col_h2, col_h3 = st.columns([3, 1.5, 2])
+    with col_h1: st.markdown("**Produit**")
+    with col_h2: st.markdown("**Quantité en réserve**")
+    with col_h3: st.markdown("**Ajouter du stock (Réassort)**")
+    st.write("---")
+
+    # On boucle sur TOUS les produits présents dans tes tarifs
+    for produit in TARIFS_CONSO.keys():
+        # Sécurité : si le produit n'existe pas encore dans le stock, on l'initialise à 0
+        if produit not in st.session_state.stocks:
+            st.session_state.stocks[produit] = 0
+
+        quantite_actuelle = st.session_state.stocks[produit]
+        
+        # Création de la ligne pour le produit
+        col_nom, col_qte, col_actions = st.columns([3, 1.5, 2])
+        
+        with col_nom:
+            st.write(f"🍹 {produit}")
+            
+        with col_qte:
+            # Alerte visuelle : si le stock est à 5 ou moins, on l'affiche en ROUGE
+            if quantite_actuelle <= 5:
+                st.markdown(f"<b style='color: #dc2626;'>{quantite_actuelle} ⚠️ (Bas)</b>", unsafe_allow_html=True)
+            else:
+                st.markdown(f"<b style='color: #16a34a;'>{quantite_actuelle}</b>", unsafe_allow_html=True)
+                
+        with col_actions:
+            # Uniquement des boutons pour AUGMENTER le stock
+            btn_col1, btn_col2 = st.columns(2)
+            if btn_col1.button("➕ 1", key=f"plus1_{produit}", use_container_width=True):
+                st.session_state.stocks[produit] += 1
+                st.rerun()
+            if btn_col2.button("➕ 10", key=f"plus10_{produit}", use_container_width=True):
+                st.session_state.stocks[produit] += 10
+                st.rerun()
+                
+    st.write("---")
     # ==========================================
     # MODULE : CHIFFRE D'AFFAIRES
     # ==========================================
