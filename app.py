@@ -75,10 +75,10 @@ st.markdown("""
 # ==========================================
 try:
     conn = st.connection("gsheets", type=GSheetsConnection)
-    url_sheet = "https://docs.google.com/spreadsheets/d/1hp2tK4WcDJcWv9ww1ZIuod-nwz8ywaGiNBiSPlYylzE"
+    mon_id = "1hp2tK4WcDJcWv9ww1ZIuod-nwz8ywaGiNBiSPlYylzE"
     
     # Lecture des données
-    data_plage = conn.read(spreadsheet=url_sheet, worksheet="plage", ttl=0)
+    data_plage = conn.read(spreadsheet=mon_id, worksheet="plage", ttl=0)
     
     # Si on arrive ici, c'est que ça a marché !
     st.sidebar.success("✅ Connecté avec succès !")
