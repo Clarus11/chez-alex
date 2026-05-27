@@ -420,8 +420,8 @@ else:
     # ==========================================
     # MODULE : RÉSERVATIONS
     # ==========================================
-   # ==========================================
-    # MODULE : RÉSERVATIONS (VERSION CORRIGÉE)
+  # ==========================================
+    # MODULE : RÉSERVATIONS (VERSION CÔTE À CÔTE)
     # ==========================================
     elif page == "📅 Réservations":
         st.markdown("<h3 style='color: #854d0e; text-align: center;'>📅 GESTION & PRÉPARATION DES RÉSERVATIONS</h3>", unsafe_allow_html=True)
@@ -433,7 +433,7 @@ else:
         if "resa_spot_sel" not in st.session_state:
             st.session_state.resa_spot_sel = None
 
-        # 1. LE SYSTÈME DE CONSULTATION / PRÉPARATION (En haut)
+        # 1. LE SYSTÈME DE CONSULTATION / PRÉPARATION
         st.markdown("### 🔍 1. Choisir le jour à consulter ou à préparer")
         date_consultation = st.date_input("Sélectionner la date de travail :", datetime.now().date(), key="date_consult")
         date_consult_str = date_consultation.strftime("%d/%m/%Y")
@@ -441,81 +441,95 @@ else:
         if date_consult_str not in st.session_state.reservations:
             st.session_state.reservations[date_consult_str] = []
 
-        # --- FENÊTRE MODALE AMÉLIORÉE (RESTE OUVERTE PENDANT LE PLACEMENT) ---
+        # --- FENÊTRE MODALE ERGONOMIQUE (CÔTE À CÔTE) ---
         @st.dialog("Plan de placement - Préparation du lendemain", width="large")
         def modal_placement(date_choisie):
             resas_du_jour = st.session_state.reservations.get(date_choisie, [])
             emplacements_pris = {r["emplacement"]: r["client"] for r in resas_du_jour if r.get("est_place") and r.get("emplacement")}
             
-            st.markdown(f"### 🗺️ Agencement de la plage pour le **{date_choisie}**")
-            st.caption("1. Cliquez sur une place libre 🟢 (elle deviendra 🟡) | 2. Choisissez le client juste en dessous.")
+            # Création de deux colonnes principales dans le pop-up
+            col_carte_gauche, col_liste_droite = st.columns([5, 3])
             
-            # Affichage de la carte
-            for l in range(1, 8):
-                cols = st.columns([1, 1, 1, 1, 1, 0.4, 1, 1, 1, 1, 1])
-                for g in range(1, 6):
-                    id_c = f"L{l}-G{g}"
-                    libre = id_c not in emplacements_pris
-                    is_selectionne = st.session_state.resa_spot_sel == id_c
+            # --- COLONNE GAUCHE : LA CARTE ---
+            with col_carte_gauche:
+                st.markdown(f"#### 🗺️ Plan du **{date_choisie}**")
+                st.caption("Cliquez sur une place libre 🟢 (elle deviendra 🟡)")
+                
+                for l in range(1, 8):
+                    cols = st.columns([1, 1, 1, 1, 1, 0.4, 1, 1, 1, 1, 1])
                     
-                    if is_selectionne:
-                        btn_label = f"🟡\n{l}-{g}"
-                    else:
-                        btn_label = f"🟢\n{l}-{g}" if libre else f"🔴\n{emplacements_pris[id_c][:5]}"
+                    # Groupes 1 à 5
+                    for g in range(1, 6):
+                        id_c = f"L{l}-G{g}"
+                        libre = id_c not in emplacements_pris
+                        is_selectionne = st.session_state.resa_spot_sel == id_c
                         
-                    if cols[g-1].button(btn_label, key=f"m_pl_{id_c}_{date_choisie}", use_container_width=True):
-                        if libre:
-                            st.session_state.resa_spot_sel = id_c
-                            st.rerun()
+                        if is_selectionne:
+                            btn_label = f"🟡\n{l}-{g}"
+                            help_txt = "Emplacement sélectionné"
                         else:
-                            st.warning("Cette place est déjà prise !")
-                        
-                with cols[5]: 
-                    st.markdown("<div style='text-align:center; font-size:9px; font-weight:bold; color:#a1a1aa; padding-top:12px;'>A<br>L<br>L</div>", unsafe_allow_html=True)
-                
-                for g in range(6, 11):
-                    id_c = f"L{l}-G{g}"
-                    libre = id_c not in emplacements_pris
-                    is_selectionne = st.session_state.resa_spot_sel == id_c
-                    
-                    if is_selectionne:
-                        btn_label = f"🟡\n{l}-{g}"
-                    else:
-                        btn_label = f"🟢\n{l}-{g}" if libre else f"🔴\n{emplacements_pris[id_c][:5]}"
-                        
-                    if cols[g].button(btn_label, key=f"m_pl_{id_c}_{date_choisie}", use_container_width=True):
-                        if libre:
-                            st.session_state.resa_spot_sel = id_c
-                            st.rerun()
-                        else:
-                            st.warning("Cette place est déjà prise !")
-
-            st.write("---")
-            
-            # Partie choix du client (s'affiche dès qu'on clique sur une place)
-            if st.session_state.resa_spot_sel:
-                id_sel = st.session_state.resa_spot_sel
-                st.markdown(f"#### 🎯 Qui installer à la place **{id_sel}** ?")
-                
-                resas_en_attente = [r for r in resas_du_jour if not r.get("est_place", False)]
-                
-                if not resas_en_attente:
-                    st.info("Tous les clients de ce jour ont déjà une place attribuée.")
-                else:
-                    for i, r in enumerate(resas_du_jour):
-                        if not r.get("est_place", False):
-                            if st.button(f"👤 Assigner {r['client']} ({r['transats']} transats) — Préf: {r['preference']}", use_container_width=True, key=f"set_{date_choisie}_{i}"):
-                                r["est_place"] = True
-                                r["emplacement"] = id_sel
-                                st.session_state.resa_spot_sel = None # On reset la place pour la suivante
+                            btn_label = f"🟢\n{l}-{g}" if libre else f"🔴\n{l}-{g}"
+                            help_txt = "Libre" if libre else f"Occupé par {emplacements_pris[id_c]}"
+                            
+                        if cols[g-1].button(btn_label, key=f"m_pl_{id_c}_{date_choisie}", help=help_txt, use_container_width=True):
+                            if libre:
+                                st.session_state.resa_spot_sel = id_c
                                 st.rerun()
-            else:
-                st.info("💡 Cliquez sur un emplacement vert 🟢 ci-dessus pour choisir où installer un client.")
+                            else:
+                                st.warning("Déjà occupé !")
+                            
+                    # Allée centrale
+                    with cols[5]: 
+                        st.markdown("<div style='text-align:center; font-size:8px; font-weight:bold; color:#a1a1aa; padding-top:10px;'>|</div>", unsafe_allow_html=True)
+                    
+                    # Groupes 6 à 10
+                    for g in range(6, 11):
+                        id_c = f"L{l}-G{g}"
+                        libre = id_c not in emplacements_pris
+                        is_selectionne = st.session_state.resa_spot_sel == id_c
+                        
+                        if is_selectionne:
+                            btn_label = f"🟡\n{l}-{g}"
+                            help_txt = "Emplacement sélectionné"
+                        else:
+                            btn_label = f"🟢\n{l}-{g}" if libre else f"🔴\n{l}-{g}"
+                            help_txt = "Libre" if libre else f"Occupé par {emplacements_pris[id_c]}"
+                            
+                        if cols[g].button(btn_label, key=f"m_pl_{id_c}_{date_choisie}", help=help_txt, use_container_width=True):
+                            if libre:
+                                st.session_state.resa_spot_sel = id_c
+                                st.rerun()
+                            else:
+                                st.warning("Déjà occupé !")
+
+            # --- COLONNE DROITE : ATTRIBUTION ET LISTE ---
+            with col_liste_droite:
+                st.markdown("#### 👤 Attribution du transat")
                 
-            st.write("---")
-            if st.button("🚪 Fermer et valider le plan de la journée", type="primary", use_container_width=True):
-                st.session_state.show_modal_placement = False
-                st.rerun()
+                if st.session_state.resa_spot_sel:
+                    id_sel = st.session_state.resa_spot_sel
+                    st.markdown(f"🎯 **Installer sur la place {id_sel} :**")
+                    
+                    resas_en_attente = [r for r in resas_du_jour if not r.get("est_place", False)]
+                    
+                    if not resas_en_attente:
+                        st.info("Tous les clients sont placés.")
+                    else:
+                        for i, r in enumerate(resas_du_jour):
+                            if not r.get("est_place", False):
+                                label_client = f"👤 {r['client']} ({r['transats']} tr.) \n 📍 Préf: {r['preference']}"
+                                if st.button(label_client, use_container_width=True, key=f"set_{date_choisie}_{i}"):
+                                    r["est_place"] = True
+                                    r["emplacement"] = id_sel
+                                    st.session_state.resa_spot_sel = None # Reset pour la place suivante
+                                    st.rerun()
+                else:
+                    st.info("💡 Cliquez sur une place verte 🟢 à gauche pour choisir qui installer.")
+                
+                st.write("---")
+                if st.button("🚪 Fermer et valider le plan", type="primary", use_container_width=True):
+                    st.session_state.show_modal_placement = False
+                    st.rerun()
         # ------------------------------------------------------------------
 
         # Déclencheur permanent du pop-up si l'état est actif
@@ -561,7 +575,6 @@ else:
         with col_liste:
             st.markdown(f"#### 📋 Liste des réservations du **{date_consult_str}**")
             
-            # Ce bouton active l'état de la fenêtre modale
             if st.button(f"🗺️ Placer les clients sur la carte du {date_consult_str}", use_container_width=True):
                 st.session_state.show_modal_placement = True
                 st.session_state.resa_spot_sel = None
