@@ -68,11 +68,11 @@ st.markdown("""
 try:
     conn = st.connection("gsheets", type=GSheetsConnection)
     
-    # On remet l'URL complète (l'extension en a besoin pour trouver le fichier)
-    url_de_mon_sheet = "https://docs.google.com/spreadsheets/d/1hp2tK4WcDJcWv9ww1ZIuod-nwz8ywaGiNBiSPlYy1zE/edit?usp=sharing"
+    # L'URL ultra-propre, sans le /edit à la fin
+    url_de_mon_sheet = "https://docs.google.com/spreadsheets/d/1hp2tK4WcDJcWv9ww1ZIuod-nwz8ywaGiNBiSPlYylzE"
     
-    # On cible bien l'onglet "plage"
-    data_plage = conn.read(spreadsheet=url_de_mon_sheet, worksheet="plage")
+    # L'arme secrète : ttl=0 force Streamlit à ignorer son cache !
+    data_plage = conn.read(spreadsheet=url_de_mon_sheet, worksheet="plage", ttl=0)
     
     st.sidebar.success("✅ Connecté à Google Sheets !")
 except Exception as e:
