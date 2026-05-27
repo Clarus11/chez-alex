@@ -1,20 +1,14 @@
 import streamlit as st
 from streamlit_gsheets import GSheetsConnection
 
-# 1. On crée la connexion
+# Connexion propre
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-# 2. On définit l'URL ici, directement dans le code
-url_sheet = "https://docs.google.com/spreadsheets/d/1hp2tK4WcDJcWv9ww1ZIuod-nwz8ywaGiNBiSPlYylzE"
+# Lecture forcée sans cache
+data_plage = conn.read(spreadsheet="1hp2tK4WcDJcWv9ww1ZIuod-nwz8ywaGiNBiSPlYylzE", worksheet="plage", ttl=0)
 
-# 3. On lit avec l'URL en paramètre obligatoire
-try:
-    df = conn.read(spreadsheet=url_sheet, worksheet="plage", ttl=0)
-    st.dataframe(df)
-    st.sidebar.success("✅ Connecté avec succès !")
-except Exception as e:
-    st.sidebar.error(f"❌ Erreur : {e}")
-    st.write(e) # Affiche l'erreur complète pour comprendre pourquoi
+# Affichage pour test
+st.write(data_plage)
 # ==========================================
 # 1. CONFIGURATION ET STYLE
 # ==========================================
