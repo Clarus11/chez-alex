@@ -1,6 +1,5 @@
 import streamlit as st
 from streamlit_gsheets import GSheetsConnection
-from datetime import datetime
 
 # ==========================================
 # 1. CONFIGURATION ET STYLE
@@ -73,23 +72,22 @@ st.markdown("""
 # ==========================================
 # # 2. CONNEXION GOOGLE SHEETS
 # ==========================================
-# 1. Définir votre identifiant (l'ID extrait de votre URL)
 ID_SHEET = "1hp2tK4WcDJcWv9ww1ZIuod-nwz8ywaGiNBiSPlYylzE"
 
 try:
     conn = st.connection("gsheets", type=GSheetsConnection)
-    # Lecture des données
     data_plage = conn.read(spreadsheet=ID_SHEET, worksheet="plage", ttl=0)
     
-    # SUCCÈS : On affiche un message positif, pas une erreur
-    st.sidebar.success("✅ Connecté avec succès !")
+    # SUCCÈS : Si on arrive ici, la connexion a réussi (code 200)
+    st.sidebar.success("✅ Données chargées avec succès !")
     
-    # Affichage des données (st.dataframe est plus propre que st.write)
-    st.dataframe(data_plage)
+    # AFFICHE TES DONNÉES ICI
+    st.write("### Voici tes données :")
+    st.dataframe(data_plage) # C'est ici que tes données apparaîtront proprement
 
 except Exception as e:
-    # ERREUR : Ce bloc ne s'affichera que s'il y a un réel problème
-    st.sidebar.error(f"❌ Erreur technique : {e}")
+    # ERREUR : Ce bloc ne s'affiche que s'il y a un VRAI problème
+    st.sidebar.error(f"❌ Erreur réelle : {e}")
 # ==========================================
 # 3. CALCUL DYNAMIQUE DES TARIFS PAR HEURES
 # ==========================================
