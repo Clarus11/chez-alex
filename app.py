@@ -73,22 +73,18 @@ st.markdown("""
 # ==========================================
 # # 2. CONNEXION GOOGLE SHEETS
 # ==========================================
+# Exemple de correction pour votre bloc try/except
 try:
+    # ... votre code de connexion ...
     conn = st.connection("gsheets", type=GSheetsConnection)
-    mon_id = "1hp2tK4WcDJcWv9ww1ZIuod-nwz8ywaGiNBiSPlYylzE"
+    data_plage = conn.read(spreadsheet=url_sheet, worksheet="plage", ttl=0)
     
-    # Lecture des données
-    data_plage = conn.read(spreadsheet=mon_id, worksheet="plage", ttl=0)
-    
-    # Si on arrive ici, c'est que ça a marché !
+    # Si le code arrive ici, c'est que la connexion a réussi (Code 200)
     st.sidebar.success("✅ Connecté avec succès !")
-    
-    # Affichage des données
-    st.write("### Contenu du Google Sheet :")
-    st.dataframe(data_plage) # Utilise st.dataframe pour une belle vue en tableau
+    # Ne rien afficher dans le bloc try concernant une erreur ici
 
 except Exception as e:
-    # On affiche l'erreur seulement si une vraie exception survient
+    # Ce bloc ne s'exécutera que s'il y a un réel problème
     st.sidebar.error(f"❌ Erreur : {e}")
 # ==========================================
 # 3. CALCUL DYNAMIQUE DES TARIFS PAR HEURES
