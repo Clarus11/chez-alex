@@ -296,16 +296,9 @@ else:
                     produit_choisi = st.selectbox("Choisir l'article :", list(TARIFS_CONSO.keys()))
                     prix_unitaire = TARIFS_CONSO[produit_choisi]
                     st.info(f"Prix unitaire : {prix_unitaire:.2f} €")
-                    
-                    # Détermination de la catégorie de stock associée
-                    if produit_choisi == "Jus Orange Pressé":
-                        cat_stock = "Oranges (Jus)"
-                    elif produit_choisi == "Virgin Mojito":
-                        cat_stock = "Menthe & Citrons (Mojito)"
-                    elif produit_choisi == "Glace Artisanale":
-                        cat_stock = "Glaces Artisanales"
-                    else:
-                        cat_stock = "Boissons & Cafés"
+
+                    # Le stock du produit exact diminue de 1 automatiquement
+                    st.session_state.stocks[produit_choisi] -= 1
 
                     col_btn_ard, col_btn_dir = st.columns(2)
                     
@@ -313,7 +306,7 @@ else:
                         if st.button("➕ Ajouter à l'Ardoise", use_container_width=True):
                             st.session_state.plage[id_sel]["conso_ardoise"] += prix_unitaire
                             st.session_state.plage[id_sel]["historique_conso"].append(f"{produit_choisi} (Ardoise)")
-                            st.session_state.stocks[cat_stock] -= 1
+                            st.session_state.stocks[produit_choisi] -= 1
                             st.rerun()
                             
                     with col_btn_dir:
@@ -321,7 +314,7 @@ else:
                             st.session_state.ca_jour += prix_unitaire
                             st.session_state.plage[id_sel]["paye_direct"] += prix_unitaire
                             st.session_state.plage[id_sel]["historique_paye_direct"].append(f"{produit_choisi} (Direct)")
-                            st.session_state.stocks[cat_stock] -= 1
+                            st.session_state.stocks[produit_choisi] -= 1
                             st.rerun()
 
                     # Résumé des consos sur la fiche
