@@ -155,6 +155,10 @@ else:
     if "notes" not in st.session_state: st.session_state.notes = []
     if "groupe_selectionne" not in st.session_state: st.session_state.groupe_selectionne = None
 
+    # Carnet de réservations (classé par date)
+    if "reservations" not in st.session_state: 
+        st.session_state.reservations = {}
+        
     # ==========================================
     # 5. NAVIGATION LATÉRALE
     # ==========================================
@@ -416,6 +420,70 @@ else:
     # ==========================================
     # MODULE : RÉSERVATIONS
     # ==========================================
+ # ==========================================
+    # MODULE : RÉSERVATIONS
+    # ==========================================
     elif page == "📅 Réservations":
+        st.markdown("<h3 style='color: #854d0e; text-align: center;'>📅 GESTION DES RÉSERVATIONS</h3>", unsafe_allow_html=True)
+        st.write("---")
+
+        # 1. Calendrier pour sélectionner le jour
+        date_sel = st.date_input("Sélectionner la date :", datetime.now().date())
+        date_str = date_sel.strftime("%d/%m/%Y")
+
+        # On crée une page vierge pour ce jour s'il n'y a pas encore de résas
+        if date_str not in st.session_state.reservations:
+            st.session_state.reservations[date_str] = []
+
+        col_form, col_liste = st.columns([1, 2])
+
+        # 2. Formulaire pour ajouter une réservation
+        with col_form:
+            st.markdown("#### ➕ Nouvelle Réservation")
+            with st.container(border=True):
+                nom_resa = st.text_input("Nom du client :")
+                tel_resa = st.text_input("Téléphone :")
+                nb_t_resa = st.number_input("Nombre de transats :", min_value=1, max_value=10, value=2)
+                
+                # Système de préférence pour le placement
+                pref_resa = st.selectbox("Préférence de placement :", [
+                    "Peu importe", 
+                    "1ère Ligne impératif", 
+                    "Sur un angle", 
+                    "Proche de l'allée", 
+                    "Ombre l'après-midi"
+                ])
+                
+                if st.button("Enregistrer", type="primary", use_container_width=True):
+                    if nom_resa:
+                        st.session_state.reservations[date_str].append({
+                            "client": nom_resa,
+                            "telephone": tel_resa,
+                            "transats": nb_t_resa,
+                            "preference": pref_resa
+                        })
+                        st.success("Réservation validée !")
+                        st.rerun()
+                    else:
+                        st.error("Le nom est obligatoire.")
+
+        # 3. Liste des réservations pour le jour sélectionné
+        with col_liste:
+            st.markdown(f"#### 📋 Liste du **{date_str}**")
+            resas_du_jour = st.session_state.reservations[date_str]
+            
+            if len(resas_du_jour) == 0:
+                st.info("Aucune réservation enregistrée pour cette date.")
+            else:
+                for i, resa in enumerate(resas_du_jour):
+                    with st.container(border=True):
+                        c_info, c_action = st.columns([5, 1])
+                        with c_info:
+                            st.markdown(f"**👤 {resa['client']}** | 🪑 {resa['transats']} transats")
+                            st.caption(f"📞 {resa['telephone']} | 📍 *{resa['preference']}*")
+                        with c_action:
+                            if st.button("❌", key=f"del_{date_str}_{i}", help="Annuler / Supprimer", use_container_width=True):
+                                st.session_state.reservations[date_str].pop(i)
+                                st.rerun()
         st.markdown(f"<h3 style='color: #854d0e;'>{page}</h3>", unsafe_allow_html=True)
         st.warning("Prêt pour la suite !")
