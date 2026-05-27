@@ -73,18 +73,19 @@ st.markdown("""
 # ==========================================
 # # 2. CONNEXION GOOGLE SHEETS
 # ==========================================
-ID_CIBLE = "1hp2tK4WcDJcWv9ww1ZIuod-nwz8ywaGiNBiSPlYylzE"
+#ID_CIBLE = "1hp2tK4WcDJcWv9ww1ZIuod-nwz8ywaGiNBiSPlYylzE"
 
-conn.read = st.connection("gsheets", type=GSheetsConnection)
+#conn.read = st.connection("gsheets", type=GSheetsConnection)
 
 # On tente de lire avec l'ID
-data_plage = conn.read(spreadsheet=ID_CIBLE, worksheet="plage")
+#data_plage = conn.read(spreadsheet=ID_CIBLE, worksheet="plage")
 
-st.write(data_plage)
+#st.write(data_plage)
 
 # 3. Affichage direct des données
-st.success("✅ Données chargées !")
-st.dataframe(data_plage)
+#st.success("✅ Données chargées !")
+#st.dataframe(data_plage)
+
 # ==========================================
 # 3. CALCUL DYNAMIQUE DES TARIFS PAR HEURES
 # ==========================================
