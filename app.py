@@ -75,15 +75,17 @@ st.markdown("""
 # ==========================================
 try:
     conn = st.connection("gsheets", type=GSheetsConnection)
-    id_de_mon_sheet = "1hp2tK4WcDJcWv9ww1ZIuod-nwz8ywaGiNBiSPlYy1zE"
+    url_sheet = "https://docs.google.com/spreadsheets/d/1hp2tK4WcDJcWv9ww1ZIuod-nwz8ywaGiNBiSPlYylzE"
+    data_plage = conn.read(spreadsheet=url_sheet, worksheet="plage", ttl=0)
     
-    # On tente de lire
-    data_plage = conn.read(spreadsheet=id_de_mon_sheet, worksheet="plage", ttl=0)
-    st.sidebar.success("✅ Connecté à Google Sheets !")
+    # Succès : affichons les données ici
+    st.sidebar.success("✅ Connecté !")
+    st.write("Voici mes données :")
+    st.dataframe(data_plage)
+
 except Exception as e:
-    st.sidebar.error(f"❌ Erreur : {e}")
-    # On affiche l'erreur pour comprendre
-    st.error(f"Détail de l'erreur : {e}")
+    # On ne garde le bloc d'erreur que pour les vrais problèmes
+    st.sidebar.error("❌ Erreur de connexion")
 # ==========================================
 # 3. CALCUL DYNAMIQUE DES TARIFS PAR HEURES
 # ==========================================
