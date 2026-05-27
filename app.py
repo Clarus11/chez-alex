@@ -303,7 +303,7 @@ else:
 
                     with col_btn_ard:
                 # Ajout d'une key unique pour stabiliser le bouton
-                    if st.button("➕ Ajouter à l'Ardoise", key=f"btn_ard_{id_sel}", use_container_width=True):
+                if st.button("➕ Ajouter à l'Ardoise", key=f"btn_ard_{id_sel}", use_container_width=True):
                     st.session_state.plage[id_sel]["conso_ardoise"] += prix_unitaire
                     st.session_state.plage[id_sel]["historique_conso"].append(f"{produit_choisi} (Ardoise)")
                     st.session_state.stocks[produit_choisi] -= 1  # 🟢 La déduction se fait UNIQUEMENT ici
@@ -311,7 +311,7 @@ else:
         
                     with col_btn_dir:
                 # Ajout d'une key unique pour stabiliser le bouton
-                    if st.button("⚡ Encaisser Direct", key=f"btn_dir_{id_sel}", use_container_width=True, type="primary"):
+                if st.button("⚡ Encaisser Direct", key=f"btn_dir_{id_sel}", use_container_width=True, type="primary"):
                     st.session_state.ca_jour += prix_unitaire
                     st.session_state.plage[id_sel]["paye_direct"] += prix_unitaire
                     st.session_state.plage[id_sel]["historique_paye_direct"].append(f"{produit_choisi} (Direct)")
