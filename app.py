@@ -5,8 +5,9 @@ from streamlit_gsheets import GSheetsConnection
 conn = st.connection("gsheets", type=GSheetsConnection)
 
 # Lecture forcée sans cache
-data_plage = conn.read(spreadsheet="1hp2tK4WcDJcWv9ww1ZIuod-nwz8ywaGiNBiSPlYylzE", worksheet="plage", ttl=0)
+url_sheet = "https://docs.google.com/spreadsheets/d/1hp2tK4WcDJcWv9ww1ZIuod-nwz8ywaGiNBiSPlYylzE/edit#gid=0"
 
+data_plage = conn.read(spreadsheet=url_sheet, worksheet="plage", ttl=0)
 # Affichage pour test
 st.write(data_plage)
 # ==========================================
