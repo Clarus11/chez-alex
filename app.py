@@ -1,5 +1,5 @@
+import streamlit as st
 from streamlit_gsheets import GSheetsConnection
-from datetime import datetime
 
 # ==========================================
 # 1. CONFIGURATION ET STYLE
@@ -65,16 +65,16 @@ st.markdown("""
 # ==========================================
 # # 2. CONNEXION GOOGLE SHEETS
 # ==========================================
+# Si tu as déjà un bloc de connexion, supprime-le et mets ça :
 try:
-    # 1. On récupère le dictionnaire depuis les secrets Streamlit
+    # 1. On récupère les secrets
     secrets_dict = st.secrets["connections"]["gsheets"].to_dict()
     
-    # 2. On supprime le champ 'type' s'il existe dans le dictionnaire 
-    # pour éviter tout conflit avec le premier paramètre de st.connection
+    # 2. On enlève le "type" pour éviter les conflits
     if "type" in secrets_dict:
         del secrets_dict["type"]
         
-    # 3. On reconstruit proprement la clé privée avec Python
+    # 3. La clé formatée (on la met ici pour être sûr qu'elle est bien lue)
     cle_formattee = "-----BEGIN PRIVATE KEY-----\n" \
                     "MIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQCcaABKIBthuP5l\n" \
                     "Nlp1i0NBJPGQGdYdqOmAPh3m3B+903TZRP0PgKbfhTa5Nrod+UNEcZgcvev033Pk\n" \
@@ -103,20 +103,16 @@ try:
                     "ex3/ZWZSQfCJ1pqFlNFx9mzDylNzemLq1mohzZALfNi9o7+LWdhxnFXkrpW/Avxd\n" \
                     "MMetrBtCuvj6+mKn1VLSQ==\n" \
                     "-----END PRIVATE KEY-----\n"
-                    
-    # 4. On écrase la clé privée du dictionnaire par la bonne clé formatée
-    secrets_dict["private_key"] = cle_formattee
 
-    # 5. On appelle le connecteur en spécifiant GSheetsConnection 
-    # ET en déballant le dictionnaire nettoyé pour les autres options
+    secrets_dict["private_key"] = cle_formattee
+    
+    # 4. Connexion finale
     conn = st.connection("gsheets", type=GSheetsConnection, **secrets_dict)
-    
-    # 6. On charge les données de l'onglet de ta plage
     data_plage = conn.read(worksheet="plage")
-    st.sidebar.success("✅ Connecté à Google Sheets !")
-    
+    st.sidebar.success("✅ Connecté !")
+
 except Exception as e:
-    st.sidebar.error(f"❌ Erreur de connexion : {e}")
+    st.sidebar.error(f"Erreur : {e}")
 # ==========================================
 # 3. CALCUL DYNAMIQUE DES TARIFS PAR HEURES
 # ==========================================
