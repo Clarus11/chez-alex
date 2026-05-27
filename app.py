@@ -72,8 +72,8 @@ try:
     conn = st.connection("gsheets", type=GSheetsConnection)
     
     # On fait un premier test de lecture de ton tableau
-    # (Si ton onglet s'appelle autrement que "Feuille1", change-le ici)
-    data_plage = conn.read(worksheet="Feuille1")
+    # (Si ton onglet s'appelle autrement que "plage", change-le ici)
+    data_plage = conn.read(worksheet="plage")
     st.sidebar.success("✅ Connecté à Google Sheets !")
 except Exception as e:
     st.sidebar.error(f"❌ Erreur de connexion : {e}")
