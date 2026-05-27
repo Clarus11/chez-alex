@@ -65,16 +65,11 @@ st.markdown("""
 # ==========================================
 # # 2. CONNEXION GOOGLE SHEETS
 # ==========================================
-import streamlit as st
-from streamlit_gsheets import GSheetsConnection
-
-# ... (ton début de code reste identique) ...
-
 try:
-    # 1. On récupère le dictionnaire de base depuis les secrets Streamlit
+    # 1. On récupère le dictionnaire depuis les secrets Streamlit
     secrets_dict = st.secrets["connections"]["gsheets"].to_dict()
     
-    # 2. On reconstruit proprement la clé privée avec des sauts de ligne corrects
+    # 2. On reconstruit proprement la clé privée avec Python
     cle_formattee = "-----BEGIN PRIVATE KEY-----\n" \
                     "MIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQCcaABKIBthuP5l\n" \
                     "Nlp1i0NBJPGQGdYdqOmAPh3m3B+903TZRP0PgKbfhTa5Nrod+UNEcZgcvev033Pk\n" \
@@ -103,20 +98,15 @@ try:
                     "ex3/ZWZSQfCJ1pqFlNFx9mzDylNzemLq1mohzZALfNi9o7+LWdhxnFXkrpW/Avxd\n" \
                     "MMetrBtCuvj6+mKn1VLSQ==\n" \
                     "-----END PRIVATE KEY-----\n"
-
-    # 3. On injecte la clé directement dans le dictionnaire des secrets
+                    
+    # 3. On y ajoute la clé formatée
     secrets_dict["private_key"] = cle_formattee
 
-    # 4. On initialise la connexion gsheets en lui passant explicitement 
-    # la clé privée via l'argument attendu par Streamlit
-    conn = st.connection(
-        "gsheets",
-        type=GSheetsConnection,
-        private_key=cle_formattee,
-        **secrets_dict
-    )
+    # 4. On lance la connexion en transmettant le dictionnaire complet.
+    # (On ne rajoute pas type=GSheetsConnection ici, Streamlit va utiliser le type 'service_account' présent dans le dictionnaire)
+    conn = st.connection("gsheets", **secrets_dict)
     
-    # 5. On charge les données de l'onglet de ton projet
+    # 5. On charge les données de l'onglet de ta plage
     data_plage = conn.read(worksheet="plage")
     st.sidebar.success("✅ Connecté à Google Sheets !")
     
