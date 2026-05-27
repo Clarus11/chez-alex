@@ -423,6 +423,9 @@ else:
  # ==========================================
     # MODULE : RÉSERVATIONS
     # ==========================================
+   # ==========================================
+    # MODULE : RÉSERVATIONS
+    # ==========================================
     elif page == "📅 Réservations":
         st.markdown("<h3 style='color: #854d0e; text-align: center;'>📅 GESTION DES RÉSERVATIONS</h3>", unsafe_allow_html=True)
         st.write("---")
@@ -431,10 +434,80 @@ else:
         date_sel = st.date_input("Sélectionner la date :", datetime.now().date())
         date_str = date_sel.strftime("%d/%m/%Y")
 
-        # On crée une page vierge pour ce jour s'il n'y a pas encore de résas
         if date_str not in st.session_state.reservations:
             st.session_state.reservations[date_str] = []
 
+        # --- FENÊTRE MODALE POUR PLACER LES CLIENTS ---
+        @st.dialog("Placer les réservations sur la plage", width="large")
+        def modal_placement(date_choisie):
+            if "resa_spot_sel" not in st.session_state:
+                st.session_state.resa_spot_sel = None
+                
+            # Étape 1 : Afficher le plan pour choisir la place
+            if st.session_state.resa_spot_sel is None:
+                st.markdown("### 1. Choisissez un emplacement libre")
+                for l in range(1, 8):
+                    cols = st.columns([1, 1, 1, 1, 1, 0.4, 1, 1, 1, 1, 1])
+                    for g in range(1, 6):
+                        id_c = f"L{l}-G{g}"
+                        libre = st.session_state.plage[id_c].get("statut", "Libre") == "Libre"
+                        btn_label = f"🟢\n{l}-{g}" if libre else f"🔴"
+                        if cols[g-1].button(btn_label, key=f"m_place_{id_c}", disabled=not libre, use_container_width=True):
+                            st.session_state.resa_spot_sel = id_c
+                            st.rerun()
+                            
+                    with cols[5]: st.markdown("<div class='allee-verticale' style='height:40px; font-size:7px;'>ALLÉE</div>", unsafe_allow_html=True)
+                    
+                    for g in range(6, 11):
+                        id_c = f"L{l}-G{g}"
+                        libre = st.session_state.plage[id_c].get("statut", "Libre") == "Libre"
+                        btn_label = f"🟢\n{l}-{g}" if libre else f"🔴"
+                        if cols[g].button(btn_label, key=f"m_place_{id_c}", disabled=not libre, use_container_width=True):
+                            st.session_state.resa_spot_sel = id_c
+                            st.rerun()
+            
+            # Étape 2 : Choisir le client à mettre sur cette place
+            else:
+                id_sel = st.session_state.resa_spot_sel
+                st.markdown(f"### 2. Qui voulez-vous installer en **{id_sel}** ?")
+                
+                resas = st.session_state.reservations.get(date_choisie, [])
+                resas_en_attente = [r for r in resas if not r.get("est_place", False)]
+                
+                if not resas_en_attente:
+                    st.info("Tous les clients de ce jour sont déjà placés !")
+                else:
+                    for i, r in enumerate(resas):
+                        if not r.get("est_place", False):
+                            if st.button(f"👤 Placer {r['client']} ({r['transats']} transats) - Préf: {r['preference']}", use_container_width=True, key=f"assign_btn_{i}"):
+                                # On met à jour le plan de plage principal
+                                st.session_state.plage[id_sel].update({
+                                    "statut": "Occupé", "client": r["client"], "nb_transats": r["transats"], 
+                                    "heure_arrivee": datetime.now().strftime("%H:%M"),
+                                    "transats_payes": False, "prix_transats_encaisse": 0.0, "conso_ardoise": 0.0,
+                                    "historique_conso": [], "paye_direct": 0.0, "historique_paye_direct": []
+                                })
+                                # On marque la réservation comme placée
+                                r["est_place"] = True
+                                st.session_state.resa_spot_sel = None
+                                st.rerun()
+                                
+                st.write("---")
+                if st.button("🔙 Retour au plan", type="secondary"):
+                    st.session_state.resa_spot_sel = None
+                    st.rerun()
+        # ----------------------------------------------
+
+        # Bouton principal pour ouvrir la fenêtre modale
+        col_btn_plan, col_vide = st.columns([1, 1])
+        with col_btn_plan:
+            if st.button("🗺️ Placer les clients sur la plage", type="primary", use_container_width=True):
+                st.session_state.resa_spot_sel = None # Réinitialise le choix avant d'ouvrir
+                modal_placement(date_str)
+                
+        st.write("---")
+
+        # Disposition de la page : Formulaire à gauche, Liste à droite
         col_form, col_liste = st.columns([1, 2])
 
         # 2. Formulaire pour ajouter une réservation
@@ -444,23 +517,18 @@ else:
                 nom_resa = st.text_input("Nom du client :")
                 tel_resa = st.text_input("Téléphone :")
                 nb_t_resa = st.number_input("Nombre de transats :", min_value=1, max_value=10, value=2)
-                
-                # Système de préférence pour le placement
                 pref_resa = st.selectbox("Préférence de placement :", [
-                    "Peu importe", 
-                    "1ère Ligne impératif", 
-                    "Sur un angle", 
-                    "Proche de l'allée", 
-                    "Ombre l'après-midi"
+                    "Peu importe", "1ère Ligne impératif", "Sur un angle", "Proche de l'allée", "Ombre l'après-midi"
                 ])
                 
-                if st.button("Enregistrer", type="primary", use_container_width=True):
+                if st.button("Enregistrer", use_container_width=True):
                     if nom_resa:
                         st.session_state.reservations[date_str].append({
                             "client": nom_resa,
                             "telephone": tel_resa,
                             "transats": nb_t_resa,
-                            "preference": pref_resa
+                            "preference": pref_resa,
+                            "est_place": False # Par défaut, il n'est pas encore sur la plage
                         })
                         st.success("Réservation validée !")
                         st.rerun()
@@ -479,11 +547,11 @@ else:
                     with st.container(border=True):
                         c_info, c_action = st.columns([5, 1])
                         with c_info:
-                            st.markdown(f"**👤 {resa['client']}** | 🪑 {resa['transats']} transats")
+                            # Indication visuelle si le client est déjà placé
+                            statut_visuel = "✅ (Placé)" if resa.get("est_place", False) else "⏳ (En attente)"
+                            st.markdown(f"**👤 {resa['client']}** | 🪑 {resa['transats']} transats | {statut_visuel}")
                             st.caption(f"📞 {resa['telephone']} | 📍 *{resa['preference']}*")
                         with c_action:
                             if st.button("❌", key=f"del_{date_str}_{i}", help="Annuler / Supprimer", use_container_width=True):
                                 st.session_state.reservations[date_str].pop(i)
                                 st.rerun()
-        st.markdown(f"<h3 style='color: #854d0e;'>{page}</h3>", unsafe_allow_html=True)
-        st.warning("Prêt pour la suite !")
