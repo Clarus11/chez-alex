@@ -73,22 +73,23 @@ st.markdown("""
 # ==========================================
 # # 2. CONNEXION GOOGLE SHEETS
 # ==========================================
-# 1. Définition de l'ID correct (avec le 'l' et non le '1')
+# 1. Définir votre identifiant (l'ID extrait de votre URL)
 ID_SHEET = "1hp2tK4WcDJcWv9ww1ZIuod-nwz8ywaGiNBiSPlYylzE"
 
 try:
     conn = st.connection("gsheets", type=GSheetsConnection)
-    
-    # 2. Lecture en utilisant l'ID
+    # Lecture des données
     data_plage = conn.read(spreadsheet=ID_SHEET, worksheet="plage", ttl=0)
     
-    # 3. Affichage réussi en dehors du bloc d'erreur
-    st.sidebar.success("✅ Connecté !")
+    # SUCCÈS : On affiche un message positif, pas une erreur
+    st.sidebar.success("✅ Connecté avec succès !")
+    
+    # Affichage des données (st.dataframe est plus propre que st.write)
     st.dataframe(data_plage)
 
 except Exception as e:
-    # Ce bloc ne s'affiche que s'il y a un réel problème technique
-    st.sidebar.error(f"Erreur de connexion : {e}")
+    # ERREUR : Ce bloc ne s'affichera que s'il y a un réel problème
+    st.sidebar.error(f"❌ Erreur technique : {e}")
 # ==========================================
 # 3. CALCUL DYNAMIQUE DES TARIFS PAR HEURES
 # ==========================================
