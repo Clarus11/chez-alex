@@ -165,16 +165,14 @@ else:
     with st.sidebar:
         st.markdown("<h2 style='color: #854d0e; text-align: center;'>CHEZ ALEX</h2>", unsafe_allow_html=True)
         st.write("---")
-           page = st.radio("Navigation :", [
-        "🏖️ Plan de la plage",
-        "📊 Récap Journalier"
-        "📅 Réservations",
-        "🛶 Pédalos",
-        "📝 Notes (To-Do List)",
-        "📦 Stocks & Frigos",
-        "📊 Chiffre d'Affaires",
-        
-          
+        page = st.radio("Navigation :", [
+            "🏖️ Plan de la plage",
+            "📊 Récap Journalier"
+            "📅 Réservations",
+            "🛶 Pédalos",
+            "📝 Notes (To-Do List)",
+            "📦 Stocks & Frigos",
+            "📊 Chiffre d'Affaires",
     ])
         st.write("---")
         if st.button("🔒 Verrouiller l'app"):
