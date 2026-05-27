@@ -75,10 +75,10 @@ st.markdown("""
 # ==========================================
 try:
     conn = st.connection("gsheets", type=GSheetsConnection)
-    url_sheet = "https://docs.google.com/spreadsheets/d/1hp2tK4WcDJcWv9ww1ZIuod-nwz8ywaGiNBiSPlYylzE"
+    id_de_mon_sheet = "1hp2tK4WcDJcWv9ww1ZIuod-nwz8ywaGiNBiSPlYy1zE"
     
     # On tente de lire
-    data_plage = conn.read(spreadsheet=url_sheet, worksheet="plage", ttl=0)
+    data_plage = conn.read(spreadsheet=id_de_mon_sheet, worksheet="plage", ttl=0)
     st.sidebar.success("✅ Connecté à Google Sheets !")
 except Exception as e:
     st.sidebar.error(f"❌ Erreur : {e}")
