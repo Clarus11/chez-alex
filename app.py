@@ -1,6 +1,15 @@
 import streamlit as st
 from streamlit_gsheets import GSheetsConnection
 
+# Connexion simple, tout est géré par le fichier secrets.toml
+conn = st.connection("gsheets", type=GSheetsConnection)
+
+# Lecture directe
+df = conn.read(worksheet="plage", ttl=0)
+
+# Affichage
+st.dataframe(df)
+
 # ==========================================
 # 1. CONFIGURATION ET STYLE
 # ==========================================
