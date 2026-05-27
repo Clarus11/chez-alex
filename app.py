@@ -68,11 +68,11 @@ st.markdown("""
 try:
     conn = st.connection("gsheets", type=GSheetsConnection)
     
-    # On utilise uniquement l'ID du sheet (extrait de ton URL), c'est beaucoup plus sûr !
-    id_de_mon_sheet = "1hp2tK4WcDJcWv9ww1ZIuod-nwz8ywaGiNBiSPlYylzE"
+    # On remet l'URL complète (l'extension en a besoin pour trouver le fichier)
+    url_de_mon_sheet = "https://docs.google.com/spreadsheets/d/1hp2tK4WcDJcWv9ww1ZIuod-nwz8ywaGiNBiSPlYylzE/edit"
     
-    # On cible explicitement l'onglet "plage" que j'ai vu sur ta photo
-    data_plage = conn.read(spreadsheet=id_de_mon_sheet, worksheet="plage")
+    # On cible bien l'onglet "plage"
+    data_plage = conn.read(spreadsheet=url_de_mon_sheet, worksheet="plage")
     
     st.sidebar.success("✅ Connecté à Google Sheets !")
 except Exception as e:
