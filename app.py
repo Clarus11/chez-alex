@@ -622,7 +622,7 @@ else:
                 tel_resa = st.text_input("Téléphone :", key="form_tel")
                 nb_t_resa = st.number_input("Nombre de transats :", min_value=1, max_value=10, value=2, key="form_nb")
                 pref_resa = st.selectbox("Préférence :", [
-                    "Peu importe", "1ère Ligne impératif", "Sur un angle", "Proche de l'allée", "Ombre l'après-midi"
+                "Peu importe", "1ère Ligne impératif", "Sur un angle", "Proche de l'allée"
                 ], key="form_pref")
                 
                 date_pour_resa = st.date_input("Date de la réservation :", datetime.now().date(), key="form_date")
