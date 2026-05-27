@@ -167,12 +167,12 @@ else:
         st.write("---")
         page = st.radio("Navigation :", [
             "🏖️ Plan de la plage",
-            "📊 Récap Journalier",
             "📅 Réservations",
             "🛶 Pédalos",
             "📝 Notes (To-Do List)",
             "📦 Stocks & Frigos",
             "📊 Chiffre d'Affaires",
+            "📊 Récap Journalier",
     ])
         st.write("---")
         if st.button("🔒 Verrouiller l'app"):
