@@ -70,7 +70,7 @@ try:
     conn = st.connection("gsheets", type=GSheetsConnection)
     
     # 2. /!\ REMPLACE L'ADRESSE CI-DESSOUS PAR LE LIEN DE TON PROPRE GOOGLE SHEET
-    url_de_mon_sheet = https://docs.google.com/spreadsheets/d/1hp2tK4WcDJcWv9ww1ZIuod-nwz8ywaGiNBiSPlYy1zE/edit?usp=sharing
+    url_de_mon_sheet = "https://docs.google.com/spreadsheets/d/1hp2tK4WcDJcWv9ww1ZIuod-nwz8ywaGiNBiSPlYy1zE/edit?usp=sharing"
     
     # 3. On lit l'onglet "plage"
     data_plage = conn.read(spreadsheet=url_de_mon_sheet, worksheet="plage")
