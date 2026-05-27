@@ -66,54 +66,18 @@ st.markdown("""
 # # 2. CONNEXION GOOGLE SHEETS
 # ==========================================
 try:
-    # 1. On récupère les secrets
-    secrets_dict = st.secrets["connections"]["gsheets"].to_dict()
+    # 1. On initialise la connexion à Google Sheets
+    conn = st.connection("gsheets", type=GSheetsConnection)
     
-    # 2. On enlève le "type" pour éviter les conflits
-    if "type" in secrets_dict:
-        del secrets_dict["type"]
-        
-    # 3. La clé formatée
-    cle_formattee = (
-        "-----BEGIN PRIVATE KEY-----\n"
-        "MIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQCcaABKIBthuP5l\n"
-        "Nlp1i0NBJPGQGdYdqOmAPh3m3B+903TZRP0PgKbfhTa5Nrod+UNEcZgcvev033Pk\n"
-        "MELUB5uDXmKfTPnim5qkzCKgcyRhajTxu8ZZGSJnbZR4DNxVi+Y5x6y+Yw72zGLv\n"
-        "eAT83/47eg1Tq9RmLUaPIkwQs01m/e3gmaCYzdDWPP6YJsfK3GUrq9rjZNCPKAEM\n"
-        "dgR5gXGtwJtOWXoBoF8tWLKJ/0KPjlhaRP4fGN9BBwBbKDUSJYMklJ+toh2rdgP0\n"
-        "YAuzPUATM8q6XiUyeEBfkY1Br5ISsep++Rlfiz0sZ0YiU7FipRKo3DkccFDfb/ZH\n"
-        "NjDU4/vHAgMBAAECggEAChKGhj+IE+SCeYklDTHRPHZBGjsXt2RD2U7mxRHC94oR\n"
-        "GdbgByoNVRKyof3cwYZmZxd7qMowUl47i+Pxwc7VnIGtDz45T3ce3+MHjdasbpuU\n"
-        "2kZx8RX1ybxcVdjaLaYrRuhNfxtJAOrLqklL5O8V48Wp6wwDSys6Qoh+Zortfqbc\n"
-        "7oTCiY+7hDw5rjgM+RkWZ+eXYNGyeEuUfA2CXMrhi/hSubBLSZJnVQoEypW5y7/N\n"
-        "ucx5GfHV/XeI2AAQMiRV6m24tiEBn0ejYoQTZzaom9kJuSn8C+52pffV+OvQmyCC\n"
-        "hr43dtjdl7V9oEKCLGg5y1kshjCgcnL3ztqowB9qbQKBgQDLo9f6Hkt92E8Hrjrp\n"
-        "67KcksG8KTYRyiIoAp1YINZJXRfYJaa8rvNUCUPPqPjG3Z915NdFQUmGdFlCEMK/\n"
-        "XJshCkzg5sR/pi9svy2Yq6GlLPaIcXuNYx37yvrLB95gbm2XMYAgovbRTPAP8zf5\n"
-        "NHuhVekCxTFnOxoy3Tm7reHIDQKBgQDEnxlbH7h0iWymfKKNR+H3XSNNQZAcg7fl\n"
-        "sUIZW5h8LnT69kqnnbn/3MJAljRoQZdzNXRW+N3RPp6+C752B8IfdKZcT3NVCKBa\n"
-        "HhbizUCxKOwJKh6pCpz8KTKmKB5RGHJx+rj7V0tGBNMtONXgtDApzkQqdd432old\n"
-        "w8oykKGqIwKBgA7TH676s542uBIkEe/jk74oROhQy7nh0Di/b/rxcQgoOcsneorz\n"
-        "5Yzxm7krYOkBS1GG1lEZXqPmJnVTyQmrUTPHjy80PYvZakxtYoFhxUPEETJ/qHHz\n"
-        "jEQ/U6CiMwMsJthB50T4+CTmh/dxSlrfAj0NhwgHmQAd4ltflYtfLjelAoGARA8C\n"
-        "Ot2O/p+3ASXxKlAwcmxF1O8V0Bjxpc6mn5pp/Moj6d6o1r4s7NjgUHTtrQzPPKzL\n"
-        "GXPJbC1ty0DLa5Wh5zt8fkVuGYgD4U27BESh2PDeSwnOVRr8XfhwtLz8SXvZ2YQ8\n"
-        "1ZtQzerLokKjHcWhSkdApyXnhpPZqqAj9D7GBtsCgYB3lLpiiOtaywCHWveTs2SZ\n"
-        "EX9cR8DFBFwq/LlDVUklSAgLJTaSwGvazUnCcA7Q5X5+7jGiXumi/sufSD0wklFh\n"
-        "ex3/ZWZSQfCJ1pqFlNFx9mzDylNzemLq1mohzZALfNi9o7+LWdhxnFXkrpW/Avxd\n"
-        "MMetrBtCuvj6+mKn1VLSQ==\n"
-        "-----END PRIVATE KEY-----\n"
-    )
-
-    secrets_dict["private_key"] = cle_formattee
-    
-    # 4. Connexion finale
-    conn = st.connection("gsheets", type=GSheetsConnection, **secrets_dict)
+    # 2. On lit les données de l'onglet "plage"
     data_plage = conn.read(worksheet="plage")
-    st.sidebar.success("✅ Connecté !")
-
+    
+    # 3. Message de confirmation (tu peux le supprimer plus tard)
+    st.sidebar.success("✅ Connecté à Google Sheets !")
+    
 except Exception as e:
-    st.sidebar.error(f"Erreur : {e}")
+    # Affiche l'erreur si quelque chose bloque
+    st.sidebar.error(f"❌ Erreur de connexion : {e}")
 # ==========================================
 # 3. CALCUL DYNAMIQUE DES TARIFS PAR HEURES
 # ==========================================
