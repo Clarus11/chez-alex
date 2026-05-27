@@ -78,7 +78,7 @@ ID_SHEET = "1hp2tK4WcDJcWv9ww1ZIuod-nwz8ywaGiNBiSPlYylzE"
 
 # 2. Connexion simple sans afficher le résultat de la connexion comme une erreur
 conn = st.connection("gsheets", type=GSheetsConnection)
-data_plage = conn.read(spreadsheet=ID_SHEET, worksheet="plage", ttl=0)
+data_plage = conn.read("Gestion_Plage_Data", worksheet="plage", ttl=0)
 
 # 3. Affichage direct des données
 st.success("✅ Données chargées !")
