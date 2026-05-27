@@ -63,7 +63,22 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 # ==========================================
-# 2. CALCUL DYNAMIQUE DES TARIFS PAR HEURES
+# # 2. CONNEXION GOOGLE SHEETS
+# ==========================================
+from streamlit_gsheets import GSheetsConnection
+
+try:
+    # On crée le messager avec Google Sheets
+    conn = st.connection("gsheets", type=GSheetsConnection)
+    
+    # On fait un premier test de lecture de ton tableau
+    # (Si ton onglet s'appelle autrement que "Feuille1", change-le ici)
+    data_plage = conn.read(worksheet="Feuille1")
+    st.sidebar.success("✅ Connecté à Google Sheets !")
+except Exception as e:
+    st.sidebar.error(f"❌ Erreur de connexion : {e}")
+# ==========================================
+# 3. CALCUL DYNAMIQUE DES TARIFS PAR HEURES
 # ==========================================
 def calculer_tarif_heures(heure_arr, heure_dep, nb_transats):
     try:
@@ -90,7 +105,7 @@ def calculer_tarif_heures(heure_arr, heure_dep, nb_transats):
         return 15.0 * nb_transats, 0.0, "Tarif Journée (Défaut)"
 
 # ==========================================
-# 3. SÉCURITÉ D'ACCÈS
+# 4. SÉCURITÉ D'ACCÈS
 # ==========================================
 if "autorise" not in st.session_state:
     st.session_state.autorise = False
@@ -110,7 +125,7 @@ if not st.session_state.autorise:
                 st.error("Mot de passe incorrect ❌")
 else:
     # ==========================================
-    # 4. INITIALISATION DES STRUCTURES DE DONNÉES
+    # 5. INITIALISATION DES STRUCTURES DE DONNÉES
     # ==========================================
     if "plage" not in st.session_state:
         st.session_state.plage = {}
@@ -160,7 +175,7 @@ else:
         st.session_state.reservations = {}
         
     # ==========================================
-    # 5. NAVIGATION LATÉRALE
+    # 6. NAVIGATION LATÉRALE
     # ==========================================
     with st.sidebar:
         st.markdown("<h2 style='color: #854d0e; text-align: center;'>CHEZ ALEX</h2>", unsafe_allow_html=True)
