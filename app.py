@@ -167,7 +167,7 @@ else:
         st.write("---")
         page = st.radio("Navigation :", [
             "🏖️ Plan de la plage",
-            "📊 Récap Journalier"
+            "📊 Récap Journalier",
             "📅 Réservations",
             "🛶 Pédalos",
             "📝 Notes (To-Do List)",
