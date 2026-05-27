@@ -179,12 +179,39 @@ else:
             st.session_state.autorise = False
             st.rerun()
 
-    # ==========================================
+   # ==========================================
     # MODULE : PLAN DE LA PLAGE
     # ==========================================
     if page == "🏖️ Plan de la plage":
         st.markdown("<h3 style='color: #854d0e; text-align: center;'>PLAN DU JOUR</h3>", unsafe_allow_html=True)
         st.write("")
+
+        # =====================================================================
+        # 🟢 AMÉLIORATION : CHARGEMENT AUTOMATIQUE DES RÉSERVATIONS DU JOUR
+        # =====================================================================
+        # 1. On récupère la date du jour
+        date_aujourdhui = datetime.now().strftime("%d/%m/%Y")
+        resas_du_jour = st.session_state.reservations.get(date_aujourdhui, [])
+        
+        # 2. On injecte les réservations si la place est libre sur la plage
+        for resa in resas_du_jour:
+            place = resa.get("emplacement")
+            
+            # Sécurité : On vérifie que la place existe dans ton plan et qu'elle est bien "Libre"
+            if place and place in st.session_state.plage and st.session_state.plage[place].get("statut", "Libre") == "Libre":
+                st.session_state.plage[place].update({
+                    "statut": "Occupé", 
+                    "client": resa["client"], 
+                    "nb_transats": resa.get("transats", 2), 
+                    "heure_arrivee": "09:00",  # Heure par défaut le matin (tu pourras la changer en cliquant sur le transat)
+                    "transats_payes": False, 
+                    "prix_transats_encaisse": 0.0, 
+                    "conso_ardoise": 0.0,
+                    "historique_conso": [], 
+                    "paye_direct": 0.0, 
+                    "historique_paye_direct": []
+                })
+        # =====================================================================
 
         for l in range(1, 8):
             st.caption(f"Ligne {l}")
@@ -329,7 +356,6 @@ else:
                         st.rerun()
 
             gerer_place(st.session_state.groupe_selectionne)
-
     # ==========================================
     # MODULE : PÉDALOS (20€/h)
     # ==========================================
