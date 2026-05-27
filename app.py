@@ -66,17 +66,16 @@ st.markdown("""
 # # 2. CONNEXION GOOGLE SHEETS
 # ==========================================
 try:
-    # 1. On initialise la connexion à Google Sheets
+    # 1. On initialise la connexion
     conn = st.connection("gsheets", type=GSheetsConnection)
     
-    # 2. On lit les données de l'onglet "plage"
-    data_plage = conn.read(worksheet="plage")
+    # 2. /!\ REMPLACE L'ADRESSE CI-DESSOUS PAR LE LIEN DE TON PROPRE GOOGLE SHEET
+    url_de_mon_sheet = https://docs.google.com/spreadsheets/d/1hp2tK4WcDJcWv9ww1ZIuod-nwz8ywaGiNBiSPlYy1zE/edit?usp=sharing
     
-    # 3. Message de confirmation (tu peux le supprimer plus tard)
+    # 3. On lit l'onglet "plage"
+    data_plage = conn.read(spreadsheet=url_de_mon_sheet, worksheet="plage")
     st.sidebar.success("✅ Connecté à Google Sheets !")
-    
 except Exception as e:
-    # Affiche l'erreur si quelque chose bloque
     st.sidebar.error(f"❌ Erreur de connexion : {e}")
 # ==========================================
 # 3. CALCUL DYNAMIQUE DES TARIFS PAR HEURES
