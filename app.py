@@ -1,19 +1,18 @@
 import streamlit as st
 from streamlit_gsheets import GSheetsConnection
+from datetime import datetime
 
-# Connexion propre
-conn = st.connection("gsheets", type=GSheetsConnection)
-
-# Lecture forcée sans cache
-url_sheet = "https://docs.google.com/spreadsheets/d/1hp2tK4WcDJcWv9ww1ZIuod-nwz8ywaGiNBiSPlYylzE/edit#gid=0"
-
-data_plage = conn.read(spreadsheet=url_sheet, worksheet="plage", ttl=0)
-# Affichage pour test
-st.write(data_plage)
 # ==========================================
 # 1. CONFIGURATION ET STYLE
 # ==========================================
 st.set_page_config(page_title="Chez Alex 2026", page_icon="🏖️", layout="wide")
+
+st.markdown("""
+    <style>
+    .stApp { background-color: #fdfaf3; }
+    /* ... ton CSS ici ... */
+    </style>
+    """, unsafe_allow_html=True)
 
 st.markdown("""
     <style>
@@ -76,16 +75,15 @@ st.markdown("""
 # ==========================================
 try:
     conn = st.connection("gsheets", type=GSheetsConnection)
+    url_sheet = "https://docs.google.com/spreadsheets/d/1hp2tK4WcDJcWv9ww1ZIuod-nwz8ywaGiNBiSPlYylzE"
     
-    # L'URL ultra-propre, sans le /edit à la fin
-    url_de_mon_sheet = "https://docs.google.com/spreadsheets/d/1hp2tK4WcDJcWv9ww1ZIuod-nwz8ywaGiNBiSPlYylzE"
-    
-    # L'arme secrète : ttl=0 force Streamlit à ignorer son cache !
-    data_plage = conn.read(spreadsheet=url_de_mon_sheet, worksheet="plage", ttl=0)
-    
+    # On tente de lire
+    data_plage = conn.read(spreadsheet=url_sheet, worksheet="plage", ttl=0)
     st.sidebar.success("✅ Connecté à Google Sheets !")
 except Exception as e:
-    st.sidebar.error(f"❌ Erreur de connexion : {e}")
+    st.sidebar.error(f"❌ Erreur : {e}")
+    # On affiche l'erreur pour comprendre
+    st.error(f"Détail de l'erreur : {e}")
 # ==========================================
 # 3. CALCUL DYNAMIQUE DES TARIFS PAR HEURES
 # ==========================================
