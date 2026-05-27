@@ -679,3 +679,118 @@ else:
                             if st.button("❌", key=f"del_{date_consult_str}_{i}", help="Supprimer", use_container_width=True):
                                 st.session_state.reservations[date_consult_str].pop(i)
                                 st.rerun()
+# ==========================================
+    # MODULE : RÉCAPITULATIF JOURNALIER & PLAN
+    # ==========================================
+    elif page == "📊 Récap Journalier":
+        st.markdown("<h3 style='color: #0f766e; text-align: center;'>📊 RÉCAPITULATIF & PLAN DE LA JOURNÉE</h3>", unsafe_allow_html=True)
+        st.write("---")
+
+        # 1. Choix du jour
+        st.markdown("### 📅 Sélectionner la date à consulter")
+        date_recap = st.date_input("Choisir un jour :", datetime.now().date(), key="date_recap_main")
+        date_recap_str = date_recap.strftime("%d/%m/%Y")
+
+        # Récupération des données du jour
+        resas_du_jour = st.session_state.reservations.get(date_recap_str, [])
+        
+        # Extraction et calculs des stats
+        emplacements_pris = {}
+        total_transats_occupes = 0
+        
+        for r in resas_du_jour:
+            if r.get("est_place") and r.get("emplacement"):
+                emplacements_pris[r["emplacement"]] = r
+                total_transats_occupes += r["transats"]
+
+        # --- BARRE DE STATISTIQUES ---
+        st.markdown("#### 📈 Chiffres clés du jour")
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric("Total Réservations", len(resas_du_jour))
+        with col2:
+            st.metric("Clients Placés", len(emplacements_pris))
+        with col3:
+            # Affichage basé sur la capacité totale de 140 transats
+            st.metric("Transats Occupés", f"{total_transats_occupes} / 140")
+
+        st.write("---")
+
+        # --- 2. VUE SUR LE PLAN DE LA PLAGE ---
+        st.markdown(f"### 🗺️ Plan d'occupation du **{date_recap_str}**")
+        st.caption("🟢 Libre | 🔴 Occupé (Passez la souris sur une case rouge pour voir le nom du client)")
+
+        # Reconstruction visuelle de la grille (7 lignes x 10 colonnes avec allée)
+        for l in range(1, 8):
+            cols = st.columns([1, 1, 1, 1, 1, 0.4, 1, 1, 1, 1, 1])
+            
+            # Groupes de gauche (1 à 5)
+            for g in range(1, 6):
+                id_c = f"L{l}-G{g}"
+                if id_c in emplacements_pris:
+                    info_c = emplacements_pris[id_c]
+                    cols[g-1].button(
+                        f"🔴\n{l}-{g}", 
+                        key=f"rec_{id_c}", 
+                        help=f"👤 Client : {info_c['client']}\n🪑 Transats : {info_c['transats']}\n📞 Tél : {info_c['telephone']}"
+                    )
+                else:
+                    cols[g-1].button(f"🟢\n{l}-{g}", key=f"rec_{id_c}", help="Emplacement Libre")
+                    
+            # Allée centrale
+            with cols[5]:
+                st.markdown("<div style='text-align:center; color:#cbd5e1; font-weight:bold; padding-top:10px;'>|</div>", unsafe_allow_html=True)
+                
+            # Groupes de droite (6 à 10)
+            for g in range(6, 11):
+                id_c = f"L{l}-G{g}"
+                if id_c in emplacements_pris:
+                    info_c = emplacements_pris[id_c]
+                    cols[g].button(
+                        f"🔴\n{l}-{g}", 
+                        key=f"rec_{id_c}", 
+                        help=f"👤 Client : {info_c['client']}\n🪑 Transats : {info_c['transats']}\n📞 Tél : {info_c['telephone']}"
+                    )
+                else:
+                    cols[g].button(f"🟢\n{l}-{g}", key=f"rec_{id_c}", help="Emplacement Libre")
+
+        st.write("---")
+
+        # --- 3. TABLEAUX RÉCAPITULATIFS EN BAS DE PAGE ---
+        st.markdown("### 📋 Listing complet de la journée")
+        
+        if not resas_du_jour:
+            st.info(f"Aucune réservation ou historique pour le {date_recap_str}.")
+        else:
+            # Séparation pour lisibilité
+            clients_installes = [r for r in resas_du_jour if r.get("est_place")]
+            clients_attente = [r for r in resas_du_jour if not r.get("est_place")]
+            
+            # Tableau des personnes placées
+            if clients_installes:
+                st.markdown("#### ✅ Emplacements attribués")
+                tableau_places = []
+                for r in clients_installes:
+                    tableau_places.append({
+                        "📍 Place": r["emplacement"],
+                        "👤 Nom Client": r["client"],
+                        "🪑 Nb Transats": r["transats"],
+                        "📞 Téléphone": r["telephone"],
+                        "🎯 Préférence": r["preference"]
+                    })
+                # Tri automatique par numéro d'emplacement pour que ce soit propre
+                tableau_places = sorted(tableau_places, key=lambda x: x["📍 Place"])
+                st.table(tableau_places)
+                
+            # Tableau des personnes pas encore placées (au cas où)
+            if clients_attente:
+                st.markdown("#### ⏳ Réservations en attente de placement pour ce jour")
+                tableau_attente = []
+                for r in clients_attente:
+                    tableau_attente.append({
+                        "👤 Nom Client": r["client"],
+                        "🪑 Nb Transats": r["transats"],
+                        "📞 Téléphone": r["telephone"],
+                        "🎯 Préférence": r["preference"]
+                    })
+                st.table(tableau_attente)
