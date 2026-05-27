@@ -297,25 +297,26 @@ else:
                     prix_unitaire = TARIFS_CONSO[produit_choisi]
                     st.info(f"Prix unitaire : {prix_unitaire:.2f} €")
 
-                    # Le stock du produit exact diminue de 1 automatiquement
-                    st.session_state.stocks[produit_choisi] -= 1
+                # 🔴 LA LIGNE DE SOUSTRACTION AUTOMATIQUE QUI ÉTAIT ICI A ÉTÉ SUPPRIMÉE 🔴
 
                     col_btn_ard, col_btn_dir = st.columns(2)
-                    
+
                     with col_btn_ard:
-                        if st.button("➕ Ajouter à l'Ardoise", use_container_width=True):
-                            st.session_state.plage[id_sel]["conso_ardoise"] += prix_unitaire
-                            st.session_state.plage[id_sel]["historique_conso"].append(f"{produit_choisi} (Ardoise)")
-                            st.session_state.stocks[produit_choisi] -= 1
-                            st.rerun()
-                            
+                # Ajout d'une key unique pour stabiliser le bouton
+                    if st.button("➕ Ajouter à l'Ardoise", key=f"btn_ard_{id_sel}", use_container_width=True):
+                    st.session_state.plage[id_sel]["conso_ardoise"] += prix_unitaire
+                    st.session_state.plage[id_sel]["historique_conso"].append(f"{produit_choisi} (Ardoise)")
+                    st.session_state.stocks[produit_choisi] -= 1  # 🟢 La déduction se fait UNIQUEMENT ici
+                    st.rerun()
+        
                     with col_btn_dir:
-                        if st.button("⚡ Encaisser Direct", use_container_width=True, type="primary"):
-                            st.session_state.ca_jour += prix_unitaire
-                            st.session_state.plage[id_sel]["paye_direct"] += prix_unitaire
-                            st.session_state.plage[id_sel]["historique_paye_direct"].append(f"{produit_choisi} (Direct)")
-                            st.session_state.stocks[produit_choisi] -= 1
-                            st.rerun()
+                # Ajout d'une key unique pour stabiliser le bouton
+                    if st.button("⚡ Encaisser Direct", key=f"btn_dir_{id_sel}", use_container_width=True, type="primary"):
+                    st.session_state.ca_jour += prix_unitaire
+                    st.session_state.plage[id_sel]["paye_direct"] += prix_unitaire
+                    st.session_state.plage[id_sel]["historique_paye_direct"].append(f"{produit_choisi} (Direct)")
+                    st.session_state.stocks[produit_choisi] -= 1  # 🟢 Et UNIQUEMENT ici
+                    st.rerun()
 
                     # Résumé des consos sur la fiche
                     if info.get("historique_conso") or info.get("historique_paye_direct"):
