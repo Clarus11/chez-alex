@@ -73,12 +73,14 @@ st.markdown("""
 # ==========================================
 # # 2. CONNEXION GOOGLE SHEETS
 # ==========================================
-# 1. Défini ton ID
-ID_SHEET = "1hp2tK4WcDJcWv9ww1ZIuod-nwz8ywaGiNBiSPlYylzE"
+ID_CIBLE = "1hp2tK4WcDJcWv9ww1ZIuod-nwz8ywaGiNBiSPlYylzE"
 
-# 2. Connexion simple sans afficher le résultat de la connexion comme une erreur
 conn = st.connection("gsheets", type=GSheetsConnection)
-data_plage = conn.read("Gestion_Plage_Data", worksheet="plage", ttl=0)
+
+# On tente de lire avec l'ID
+data_plage = conn.read(spreadsheet=ID_CIBLE, worksheet="plage")
+
+st.write(data_plage)
 
 # 3. Affichage direct des données
 st.success("✅ Données chargées !")
