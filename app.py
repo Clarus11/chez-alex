@@ -69,7 +69,7 @@ try:
     conn = st.connection("gsheets", type=GSheetsConnection)
     
     # On remet l'URL complète (l'extension en a besoin pour trouver le fichier)
-    url_de_mon_sheet = "https://docs.google.com/spreadsheets/d/1hp2tK4WcDJcWv9ww1ZIuod-nwz8ywaGiNBiSPlYylzE/edit"
+    url_de_mon_sheet = "https://docs.google.com/spreadsheets/d/1hp2tK4WcDJcWv9ww1ZIuod-nwz8ywaGiNBiSPlYy1zE/edit?usp=sharing"
     
     # On cible bien l'onglet "plage"
     data_plage = conn.read(spreadsheet=url_de_mon_sheet, worksheet="plage")
