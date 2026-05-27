@@ -421,17 +421,19 @@ else:
     # MODULE : RÉSERVATIONS
     # ==========================================
   # ==========================================
-    # MODULE : RÉSERVATIONS (VERSION CÔTE À CÔTE)
+    # MODULE : RÉSERVATIONS (MODE DÉPLACEMENT DIRECT)
     # ==========================================
     elif page == "📅 Réservations":
         st.markdown("<h3 style='color: #854d0e; text-align: center;'>📅 GESTION & PRÉPARATION DES RÉSERVATIONS</h3>", unsafe_allow_html=True)
         st.write("---")
 
-        # Initialisation des variables d'état pour la fenêtre pop-up
+        # Initialisation des variables d'état pour le pop-up
         if "show_modal_placement" not in st.session_state:
             st.session_state.show_modal_placement = False
         if "resa_spot_sel" not in st.session_state:
             st.session_state.resa_spot_sel = None
+        if "moving_client_idx" not in st.session_state:
+            st.session_state.moving_client_idx = None
 
         # 1. LE SYSTÈME DE CONSULTATION / PRÉPARATION
         st.markdown("### 🔍 1. Choisir le jour à consulter ou à préparer")
@@ -441,19 +443,23 @@ else:
         if date_consult_str not in st.session_state.reservations:
             st.session_state.reservations[date_consult_str] = []
 
-        # --- FENÊTRE MODALE ERGONOMIQUE (CÔTE À CÔTE) ---
+        # --- FENÊTRE MODALE AVEC DEPLACEMENT INTUITIF ---
         @st.dialog("Plan de placement - Préparation du lendemain", width="large")
         def modal_placement(date_choisie):
             resas_du_jour = st.session_state.reservations.get(date_choisie, [])
-            emplacements_pris = {r["emplacement"]: r["client"] for r in resas_du_jour if r.get("est_place") and r.get("emplacement")}
             
-            # Création de deux colonnes principales dans le pop-up
+            # Dictionnaire pour savoir rapidement qui est sur quelle place { "L1-G1": {"client": "Nom", "index": 0} }
+            emplacements_pris = {}
+            for idx, r in enumerate(resas_du_jour):
+                if r.get("est_place") and r.get("emplacement"):
+                    emplacements_pris[r["emplacement"]] = {"nom": r["client"], "index": idx}
+            
             col_carte_gauche, col_liste_droite = st.columns([5, 3])
             
             # --- COLONNE GAUCHE : LA CARTE ---
             with col_carte_gauche:
                 st.markdown(f"#### 🗺️ Plan du **{date_choisie}**")
-                st.caption("Cliquez sur une place libre 🟢 (elle deviendra 🟡)")
+                st.caption("🟢 Libre | 🔴 Occupé | 🟡 Sélectionné | 🔵 En cours de déplacement")
                 
                 for l in range(1, 8):
                     cols = st.columns([1, 1, 1, 1, 1, 0.4, 1, 1, 1, 1, 1])
@@ -462,21 +468,39 @@ else:
                     for g in range(1, 6):
                         id_c = f"L{l}-G{g}"
                         libre = id_c not in emplacements_pris
-                        is_selectionne = st.session_state.resa_spot_sel == id_c
                         
-                        if is_selectionne:
+                        # Vérification du statut visuel de la case
+                        is_selectionne = st.session_state.resa_spot_sel == id_c
+                        is_en_deplacement = False
+                        if st.session_state.moving_client_idx is not None:
+                            idx_m = st.session_state.moving_client_idx
+                            if resas_du_jour[idx_m].get("emplacement") == id_c:
+                                is_en_deplacement = True
+                        
+                        if is_en_deplacement:
+                            btn_label = f"🔵\n{l}-{g}"
+                            help_txt = "Client sélectionné pour changement de place"
+                        elif is_selectionne:
                             btn_label = f"🟡\n{l}-{g}"
-                            help_txt = "Emplacement sélectionné"
+                            help_txt = f"Sélectionné : {id_c}"
                         else:
                             btn_label = f"🟢\n{l}-{g}" if libre else f"🔴\n{l}-{g}"
-                            help_txt = "Libre" if libre else f"Occupé par {emplacements_pris[id_c]}"
+                            help_txt = "Libre" if libre else f"Occupé par {emplacements_pris[id_c]['nom']}"
                             
                         if cols[g-1].button(btn_label, key=f"m_pl_{id_c}_{date_choisie}", help=help_txt, use_container_width=True):
-                            if libre:
-                                st.session_state.resa_spot_sel = id_c
+                            # LOGIQUE AU CLIC SUR LA CARTE
+                            if st.session_state.moving_client_idx is not None:
+                                if is_en_deplacement:
+                                    st.session_state.moving_client_idx = None # Clic sur lui-même = Annuler
+                                elif libre:
+                                    resas_du_jour[st.session_state.moving_client_idx]["emplacement"] = id_c
+                                    st.session_state.moving_client_idx = None
+                                else:
+                                    st.error("Cette place est déjà prise !")
                                 st.rerun()
                             else:
-                                st.warning("Déjà occupé !")
+                                st.session_state.resa_spot_sel = id_c
+                                st.rerun()
                             
                     # Allée centrale
                     with cols[5]: 
@@ -486,53 +510,104 @@ else:
                     for g in range(6, 11):
                         id_c = f"L{l}-G{g}"
                         libre = id_c not in emplacements_pris
-                        is_selectionne = st.session_state.resa_spot_sel == id_c
                         
-                        if is_selectionne:
+                        is_selectionne = st.session_state.resa_spot_sel == id_c
+                        is_en_deplacement = False
+                        if st.session_state.moving_client_idx is not None:
+                            idx_m = st.session_state.moving_client_idx
+                            if resas_du_jour[idx_m].get("emplacement") == id_c:
+                                is_en_deplacement = True
+                        
+                        if is_en_deplacement:
+                            btn_label = f"🔵\n{l}-{g}"
+                            help_txt = "Client sélectionné pour changement de place"
+                        elif is_selectionne:
                             btn_label = f"🟡\n{l}-{g}"
-                            help_txt = "Emplacement sélectionné"
+                            help_txt = f"Sélectionné : {id_c}"
                         else:
                             btn_label = f"🟢\n{l}-{g}" if libre else f"🔴\n{l}-{g}"
-                            help_txt = "Libre" if libre else f"Occupé par {emplacements_pris[id_c]}"
+                            help_txt = "Libre" if libre else f"Occupé par {emplacements_pris[id_c]['nom']}"
                             
                         if cols[g].button(btn_label, key=f"m_pl_{id_c}_{date_choisie}", help=help_txt, use_container_width=True):
-                            if libre:
-                                st.session_state.resa_spot_sel = id_c
+                            # LOGIQUE AU CLIC SUR LA CARTE
+                            if st.session_state.moving_client_idx is not None:
+                                if is_en_deplacement:
+                                    st.session_state.moving_client_idx = None
+                                elif libre:
+                                    resas_du_jour[st.session_state.moving_client_idx]["emplacement"] = id_c
+                                    st.session_state.moving_client_idx = None
+                                else:
+                                    st.error("Cette place est déjà prise !")
                                 st.rerun()
                             else:
-                                st.warning("Déjà occupé !")
+                                st.session_state.resa_spot_sel = id_c
+                                st.rerun()
 
-            # --- COLONNE DROITE : ATTRIBUTION ET LISTE ---
+            # --- COLONNE DROITE : ATTRIBUTION ET ACTIONS RAPIDES ---
             with col_liste_droite:
-                st.markdown("#### 👤 Attribution du transat")
+                st.markdown("#### ⚙️ Action / Attribution")
                 
-                if st.session_state.resa_spot_sel:
+                # CAS A : UN CLIENT EST EN COURS DE DÉPLACEMENT
+                if st.session_state.moving_client_idx is not None:
+                    client_concerne = resas_du_jour[st.session_state.moving_client_idx]
+                    st.warning(f"🔄 **Mode Déplacement Actif**")
+                    st.markdown(f"Où voulez-vous déplacer **{client_concerne['client']}** ?")
+                    st.info("👉 Cliquez directement sur une case verte 🟢 de la carte pour l'y transférer.")
+                    if st.button("❌ Annuler le déplacement", use_container_width=True):
+                        st.session_state.moving_client_idx = None
+                        st.rerun()
+                
+                # CAS B : L'UTILISATEUR A CLIQUÉ SUR UNE CASE
+                elif st.session_state.resa_spot_sel:
                     id_sel = st.session_state.resa_spot_sel
-                    st.markdown(f"🎯 **Installer sur la place {id_sel} :**")
                     
-                    resas_en_attente = [r for r in resas_du_jour if not r.get("est_place", False)]
-                    
-                    if not resas_en_attente:
-                        st.info("Tous les clients sont placés.")
+                    # SI LA CASE EST OCCUPÉE -> ON PROPOSE LE CHANGEMENT DIRECT
+                    if id_sel in emplacements_pris:
+                        info_occupant = emplacements_pris[id_sel]
+                        client_r = resas_du_jour[info_occupant["index"]]
+                        
+                        st.error(f"🔴 Place **{id_sel}** : **{info_occupant['nom']}**")
+                        st.caption(f"🪑 {client_r['transats']} transats | 📍 Préf: {client_r['preference']}")
+                        
+                        # LE BOUTON MAGIQUE QUE TU VOULAIS :
+                        if st.button("🔄 Déplacer ce client vers une autre place", type="primary", use_container_width=True):
+                            st.session_state.moving_client_idx = info_occupant["index"]
+                            st.session_state.resa_spot_sel = None
+                            st.rerun()
+                            
+                        if st.button("🔓 Retirer de cette place (remettre en attente)", type="secondary", use_container_width=True):
+                            client_r["est_place"] = False
+                            client_r["emplacement"] = None
+                            st.session_state.resa_spot_sel = None
+                            st.rerun()
+                            
+                    # SI LA CASE EST LIBRE -> LISTE CLASSIQUE DES GENS EN ATTENTE
                     else:
-                        for i, r in enumerate(resas_du_jour):
-                            if not r.get("est_place", False):
-                                label_client = f"👤 {r['client']} ({r['transats']} tr.) \n 📍 Préf: {r['preference']}"
-                                if st.button(label_client, use_container_width=True, key=f"set_{date_choisie}_{i}"):
-                                    r["est_place"] = True
-                                    r["emplacement"] = id_sel
-                                    st.session_state.resa_spot_sel = None # Reset pour la place suivante
-                                    st.rerun()
+                        st.success(f"🎯 **Attribuer la place {id_sel} :**")
+                        resas_en_attente = [r for r in resas_du_jour if not r.get("est_place", False)]
+                        
+                        if not resas_en_attente:
+                            st.info("Aucun client en attente pour ce jour.")
+                        else:
+                            for i, r in enumerate(resas_du_jour):
+                                if not r.get("est_place", False):
+                                    label_client = f"👤 {r['client']} ({r['transats']} tr.) \n 📍 Préf: {r['preference']}"
+                                    if st.button(label_client, use_container_width=True, key=f"set_{date_choisie}_{i}"):
+                                        r["est_place"] = True
+                                        r["emplacement"] = id_sel
+                                        st.session_state.resa_spot_sel = None
+                                        st.rerun()
                 else:
-                    st.info("💡 Cliquez sur une place verte 🟢 à gauche pour choisir qui installer.")
+                    st.info("💡 Cliquez sur une place pour commencer.\n\nPour déplacer un client : cliquez sur sa place rouge 🔴 puis sur 'Déplacer'.")
                 
                 st.write("---")
                 if st.button("🚪 Fermer et valider le plan", type="primary", use_container_width=True):
                     st.session_state.show_modal_placement = False
+                    st.session_state.moving_client_idx = None
+                    st.session_state.resa_spot_sel = None
                     st.rerun()
         # ------------------------------------------------------------------
 
-        # Déclencheur permanent du pop-up si l'état est actif
         if st.session_state.show_modal_placement:
             modal_placement(date_consult_str)
 
@@ -578,6 +653,7 @@ else:
             if st.button(f"🗺️ Placer les clients sur la carte du {date_consult_str}", use_container_width=True):
                 st.session_state.show_modal_placement = True
                 st.session_state.resa_spot_sel = None
+                st.session_state.moving_client_idx = None
                 st.rerun()
                 
             st.write("---")
