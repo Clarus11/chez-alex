@@ -299,7 +299,7 @@ else:
 
                 # 🔴 LA LIGNE DE SOUSTRACTION AUTOMATIQUE QUI ÉTAIT ICI A ÉTÉ SUPPRIMÉE 🔴
 
-                    col_btn_ard, col_btn_dir = st.columns(2)
+            col_btn_ard, col_btn_dir = st.columns(2)
 
             with col_btn_ard:
                 # Ajout d'une key unique pour stabiliser le bouton
