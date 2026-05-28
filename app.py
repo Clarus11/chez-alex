@@ -74,6 +74,8 @@ st.markdown("""
     .allee-verticale { background-color: #fef08a; color: #854d0e; font-weight: bold; text-align: center; padding: 10px 1px; border-radius: 4px; font-size: 9px; writing-mode: vertical-lr; transform: rotate(180deg); height: 55px; display: flex; align-items: center; justify-content: center; }
     .total-display { background-color: #1e3a8a; color: white; padding: 12px; border-radius: 8px; text-align: center; font-size: 18px; font-weight: bold; margin-top: 10px; margin-bottom: 10px; }
     .paye-direct-display { background-color: #10b981; color: white; padding: 10px; border-radius: 8px; text-align: center; font-size: 14px; font-weight: bold; margin-top: 10px; margin-bottom: 10px; }
+    .pedalo-sep { border-top: 2px solid rgba(0,0,0,0.06); margin: 8px 0; }
+    .small-number-btn { background: transparent; border: none; color: #0b6fe0; font-weight: 700; cursor: pointer; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -189,38 +191,53 @@ with st.sidebar:
         safe_rerun()
 
 # -------------------------
+# Helper : format date keys
+# -------------------------
+def date_to_key(d: date):
+    return d.strftime("%d/%m/%Y")
+
+# -------------------------
 # PLAN DE LA PLAGE
 # -------------------------
 if page == "🏖️ Plan de la plage":
     st.markdown("<h3 style='color: #854d0e; text-align: center;'>PLAN DU JOUR</h3>", unsafe_allow_html=True)
 
+    # Choix de la date du plan (connectée aux réservations)
     date_plan = st.date_input("Choisir la date du plan", value=datetime.now().date(), key="date_plan")
     date_plan_iso = date_plan.strftime("%Y-%m-%d")
-    date_plan_clef = date_plan.strftime("%d/%m/%Y")
+    date_plan_clef = date_to_key(date_plan)
 
+    # Charger données supabase pour la date sélectionnée
     charger_donnees_depuis_supabase(date_iso=date_plan_iso)
 
+    # Appliquer les réservations assignées pour cette date (liaison réservation -> plan)
     resas_du_jour = st.session_state.reservations.get(date_plan_clef, [])
     for resa in resas_du_jour:
         assigned = resa.get("assigned_place")
-        if assigned and assigned in st.session_state.plage:
-            if st.session_state.plage[assigned].get("statut", "Libre") == "Libre":
-                st.session_state.plage[assigned].update({
-                    "statut": "Occupé",
-                    "client": resa.get("client", ""),
-                    "nb_transats": resa.get("transats", 2),
-                    "heure_arrivee": "09:00",
-                    "transats_payes": False,
-                    "prix_transats_encaisse": 0.0,
-                    "conso_ardoise": 0.0,
-                    "historique_conso": [],
-                    "paye_direct": 0.0,
-                    "historique_paye_direct": []
-                })
+        assigned_date = resa.get("assigned_date")
+        # si la réservation a été assignée pour cette date, on l'affiche sur le plan
+        if assigned and assigned_date == date_plan_clef:
+            if assigned in st.session_state.plage:
+                # n'écrase pas si déjà occupé par autre chose (priorité : Supabase / installation)
+                if st.session_state.plage[assigned].get("statut", "Libre") == "Libre":
+                    st.session_state.plage[assigned].update({
+                        "statut": "Occupé",
+                        "client": resa.get("client", ""),
+                        "nb_transats": resa.get("transats", 2),
+                        "heure_arrivee": resa.get("heure_arrivee", "09:00"),
+                        "transats_payes": False,
+                        "prix_transats_encaisse": 0.0,
+                        "conso_ardoise": 0.0,
+                        "historique_conso": [],
+                        "paye_direct": 0.0,
+                        "historique_paye_direct": []
+                    })
 
+    # Rendu du plan : grille de lignes et colonnes
     for l in range(1, 8):
         st.caption(f"Ligne {l}")
         cols = st.columns([1,1,1,1,1,0.4,1,1,1,1,1])
+        # gauche
         for g in range(1, 6):
             id_c = f"L{l}-G{g}"
             info = st.session_state.plage[id_c]
@@ -228,8 +245,10 @@ if page == "🏖️ Plan de la plage":
             if cols[g-1].button(label, key=f"btn_place_{id_c}"):
                 st.session_state.groupe_selectionne = id_c
                 safe_rerun()
+        # allée verticale
         with cols[5]:
             st.markdown("<div class='allee-verticale'>ALLÉE</div>", unsafe_allow_html=True)
+        # droite
         for g in range(6, 11):
             id_c = f"L{l}-G{g}"
             info = st.session_state.plage[id_c]
@@ -238,167 +257,162 @@ if page == "🏖️ Plan de la plage":
                 st.session_state.groupe_selectionne = id_c
                 safe_rerun()
 
-    # Gestion de la place sélectionnée (sans modal)
+    # Gestion de la place sélectionnée via modal (superposition)
     if st.session_state.groupe_selectionne:
         id_sel = st.session_state.groupe_selectionne
-        info = st.session_state.plage.get(id_sel, {})
-
-        if "historique_conso" not in info:
-            info["historique_conso"] = []
-        if "historique_paye_direct" not in info:
-            info["historique_paye_direct"] = []
-        if "paye_direct" not in info:
-            info["paye_direct"] = 0.0
-        if "conso_ardoise" not in info:
-            info["conso_ardoise"] = 0.0
-
-        info_local = st.session_state.plage[id_sel]
+        info_local = st.session_state.plage.get(id_sel, {})
         num_l, num_g = id_sel.replace("L", "").split("-G")
         st.write("---")
         st.markdown(f"## Emplacement **{num_l}-{num_g}**")
 
-        if info_local.get("statut", "Libre") == "Libre":
-            nom = st.text_input("👤 Nom du client :", key=f"nom_client_{id_sel}")
-            nb_t = st.number_input("🪑 Nombre de transats :", min_value=1, max_value=4,
-                                   value=info_local.get("nb_transats", 2), key=f"nbt_{id_sel}")
-            h_a = st.text_input("⏰ Heure d'arrivée :", datetime.now().strftime("%H:%M"), key=f"ha_{id_sel}")
-            if st.button("✅ Installer le client", key=f"installer_{id_sel}", type="primary"):
-                if not nom:
-                    st.error("Nom obligatoire.")
-                else:
-                    st.session_state.plage[id_sel].update({
-                        "statut": "Occupé", "client": nom, "nb_transats": nb_t, "heure_arrivee": h_a,
-                        "transats_payes": False, "prix_transats_encaisse": 0.0, "conso_ardoise": 0.0,
-                        "historique_conso": [], "paye_direct": 0.0, "historique_paye_direct": []
-                    })
-                    date_for_insert = date_plan.isoformat()
-                    try:
-                        supabase.table("transats").insert({
-                            "date": date_for_insert,
-                            "numero_transat": id_sel,
-                            "nom_client": nom,
-                            "periode": "Journée",
-                            "prix": 0.0,
-                            "statut_paiement": "Occupé"
-                        }).execute()
-                    except Exception:
-                        pass
-                    st.success("Client installé.")
-                    safe_rerun()
-        else:
-            st.markdown(
-                f"**Client :** {info_local.get('client','-')}  |  **Transats :** {info_local.get('nb_transats',2)}  |  **Arrivée :** {info_local.get('heure_arrivee','-')}")
-            h_actuelle = datetime.now().strftime("%H:%M")
-            h_dep = st.text_input("⏳ Heure de départ / calcul :", h_actuelle, key=f"hd_{id_sel}")
-            frais_transats, heures_passees, libelle_tarif = calculer_tarif_heures(
-                info_local.get("heure_arrivee", "00:00"), h_dep, info_local.get("nb_transats", 2)
-            )
-            st.markdown(f"⏱️ *Temps : {heures_passees:.2f}h* — **{libelle_tarif}**")
+        # Utilisation d'une modal pour éviter de scroller
+        with st.modal(f"Éditer {id_sel}", key=f"modal_{id_sel}"):
+            if info_local.get("statut", "Libre") == "Libre":
+                nom = st.text_input("👤 Nom du client :", key=f"nom_client_{id_sel}")
+                nb_t = st.number_input("🪑 Nombre de transats :", min_value=1, max_value=4,
+                                       value=info_local.get("nb_transats", 2), key=f"nbt_{id_sel}")
+                h_a = st.text_input("⏰ Heure d'arrivée :", datetime.now().strftime("%H:%M"), key=f"ha_{id_sel}")
+                if st.button("✅ Installer le client", key=f"installer_{id_sel}", type="primary"):
+                    if not nom:
+                        st.error("Nom obligatoire.")
+                    else:
+                        st.session_state.plage[id_sel].update({
+                            "statut": "Occupé", "client": nom, "nb_transats": nb_t, "heure_arrivee": h_a,
+                            "transats_payes": False, "prix_transats_encaisse": 0.0, "conso_ardoise": 0.0,
+                            "historique_conso": [], "paye_direct": 0.0, "historique_paye_direct": []
+                        })
+                        date_for_insert = date_plan.isoformat()
+                        try:
+                            supabase.table("transats").insert({
+                                "date": date_for_insert,
+                                "numero_transat": id_sel,
+                                "nom_client": nom,
+                                "periode": "Journée",
+                                "prix": 0.0,
+                                "statut_paiement": "Occupé"
+                            }).execute()
+                        except Exception:
+                            pass
+                        st.success("Client installé.")
+                        st.session_state.groupe_selectionne = None
+                        safe_rerun()
+            else:
+                st.markdown(
+                    f"**Client :** {info_local.get('client','-')}  |  **Transats :** {info_local.get('nb_transats',2)}  |  **Arrivée :** {info_local.get('heure_arrivee','-')}")
+                h_actuelle = datetime.now().strftime("%H:%M")
+                h_dep = st.text_input("⏳ Heure de départ / calcul :", h_actuelle, key=f"hd_{id_sel}")
+                frais_transats, heures_passees, libelle_tarif = calculer_tarif_heures(
+                    info_local.get("heure_arrivee", "00:00"), h_dep, info_local.get("nb_transats", 2)
+                )
+                st.markdown(f"⏱️ *Temps : {heures_passees:.2f}h* — **{libelle_tarif}**")
 
-            st.write("---")
-            st.write("💰 **Règlement des Transats :**")
-            if not info_local.get("transats_payes", False):
-                st.warning(f"Montant dû : {frais_transats:.2f} €")
-                if st.button("💵 Encaisser les transats DIRECT (Sur le transat)", key=f"encaisser_transat_{id_sel}"):
-                    st.session_state.ca_jour = st.session_state.get("ca_jour", 0.0) + frais_transats
-                    st.session_state.plage[id_sel]["transats_payes"] = True
-                    st.session_state.plage[id_sel]["prix_transats_encaisse"] = frais_transats
+                st.write("---")
+                st.write("💰 **Règlement des Transats :**")
+                if not info_local.get("transats_payes", False):
+                    st.warning(f"Montant dû : {frais_transats:.2f} €")
+                    if st.button("💵 Encaisser les transats DIRECT (Sur le transat)", key=f"encaisser_transat_{id_sel}"):
+                        st.session_state.ca_jour = st.session_state.get("ca_jour", 0.0) + frais_transats
+                        st.session_state.plage[id_sel]["transats_payes"] = True
+                        st.session_state.plage[id_sel]["prix_transats_encaisse"] = frais_transats
+                        try:
+                            supabase.table("transats").update({
+                                "prix": frais_transats,
+                                "statut_paiement": "Payé"
+                            }).eq("date", date_plan.isoformat()).eq("numero_transat", id_sel).execute()
+                        except Exception:
+                            pass
+                        st.success("Transats encaissés.")
+                        st.session_state.groupe_selectionne = None
+                        safe_rerun()
+                else:
+                    st.success(f"✅ Transats réglés ({info_local.get('prix_transats_encaisse',0.0):.2f} €)")
+
+                st.write("---")
+                st.write("🛒 **Ajouter une Consommation :**")
+                produit_choisi = st.selectbox("Choisir l'article :", list(TARIFS_CONSO.keys()), key=f"sel_prod_{id_sel}")
+                prix_unitaire = TARIFS_CONSO[produit_choisi]
+                st.info(f"Prix unitaire : {prix_unitaire:.2f} €")
+                col_btn_ard, col_btn_dir = st.columns(2)
+                with col_btn_ard:
+                    if st.button("➕ Ajouter à l'Ardoise", key=f"btn_ard_{id_sel}"):
+                        try:
+                            st.session_state.plage[id_sel]["conso_ardoise"] = \
+                                st.session_state.plage[id_sel].get("conso_ardoise", 0.0) + prix_unitaire
+                            st.session_state.plage[id_sel]["historique_conso"].append(f"{produit_choisi} (Ardoise)")
+                            st.session_state.stocks[produit_choisi] = st.session_state.stocks.get(produit_choisi, 0) - 1
+                            nouvelle_conso = {
+                                "article": produit_choisi,
+                                "quantite": 1,
+                                "prix_total": prix_unitaire,
+                                "numero_transat_associe": id_sel,
+                                "date": date_plan.isoformat()
+                            }
+                            supabase.table("consommations").insert(nouvelle_conso).execute()
+                        except Exception:
+                            pass
+                        st.success("Ajouté à l'ardoise.")
+                        safe_rerun()
+                with col_btn_dir:
+                    if st.button("⚡ Encaisser Direct", key=f"btn_dir_{id_sel}"):
+                        try:
+                            st.session_state.ca_jour = st.session_state.get("ca_jour", 0.0) + prix_unitaire
+                            st.session_state.plage[id_sel]["paye_direct"] = \
+                                st.session_state.plage[id_sel].get("paye_direct", 0.0) + prix_unitaire
+                            st.session_state.plage[id_sel]["historique_paye_direct"].append(f"{produit_choisi} (Direct)")
+                            st.session_state.stocks[produit_choisi] = st.session_state.stocks.get(produit_choisi, 0) - 1
+                            nouvelle_conso = {
+                                "article": produit_choisi,
+                                "quantite": 1,
+                                "prix_total": prix_unitaire,
+                                "date": date_plan.isoformat()
+                            }
+                            supabase.table("consommations").insert(nouvelle_conso).execute()
+                        except Exception:
+                            pass
+                        st.success("Encaissement direct effectué.")
+                        safe_rerun()
+
+                if info_local.get("historique_conso") or info_local.get("historique_paye_direct"):
+                    with st.expander("👀 Voir le détail des consos"):
+                        if info_local.get("historique_conso"):
+                            st.write("**Sur l'Ardoise :**")
+                            for c in info_local["historique_conso"]:
+                                st.text(f" ⏳ {c}")
+                        if info_local.get("historique_paye_direct"):
+                            st.write("**Déjà payé en direct :**")
+                            for c in info_local["historique_paye_direct"]:
+                                st.text(f" ✅ {c}")
+
+                st.write("---")
+                transats_dus = 0.0 if info_local.get("transats_payes", False) else frais_transats
+                total_du_final = transats_dus + info_local.get("conso_ardoise", 0.0)
+                st.markdown(
+                    f"<div class='paye-direct-display'>DÉJÀ ENCAISSÉ EN DIRECT : {info_local.get('paye_direct', 0.0) + info_local.get('prix_transats_encaisse', 0.0):.2f} €</div>",
+                    unsafe_allow_html=True)
+                st.markdown(
+                    f"<div class='total-display'>RESTE À PAYER AU DÉPART : {total_du_final:.2f} €</div>",
+                    unsafe_allow_html=True)
+
+                col_f1, col_f2 = st.columns(2)
+                if col_f1.button("💵 ENCAISSER RESTE & LIBÉRER", key=f"liberer_{id_sel}"):
                     try:
+                        st.session_state.ca_jour = st.session_state.get("ca_jour", 0.0) + total_du_final
                         supabase.table("transats").update({
-                            "prix": frais_transats,
-                            "statut_paiement": "Payé"
+                            "prix": info_local.get('prix_transats_encaisse', 0.0) + transats_dus,
+                            "statut_paiement": "Libre"
                         }).eq("date", date_plan.isoformat()).eq("numero_transat", id_sel).execute()
                     except Exception:
                         pass
-                    st.success("Transats encaissés.")
+                    st.session_state.plage[id_sel] = {
+                        "statut": "Libre", "client": "", "heure_arrivee": "", "nb_transats": 2,
+                        "transats_payes": False, "prix_transats_encaisse": 0.0, "conso_ardoise": 0.0,
+                        "historique_conso": [], "paye_direct": 0.0, "historique_paye_direct": []
+                    }
+                    st.session_state.groupe_selectionne = None
                     safe_rerun()
-            else:
-                st.success(f"✅ Transats réglés ({info_local.get('prix_transats_encaisse',0.0):.2f} €)")
-
-            st.write("---")
-            st.write("🛒 **Ajouter une Consommation :**")
-            produit_choisi = st.selectbox("Choisir l'article :", list(TARIFS_CONSO.keys()), key=f"sel_prod_{id_sel}")
-            prix_unitaire = TARIFS_CONSO[produit_choisi]
-            st.info(f"Prix unitaire : {prix_unitaire:.2f} €")
-            col_btn_ard, col_btn_dir = st.columns(2)
-            with col_btn_ard:
-                if st.button("➕ Ajouter à l'Ardoise", key=f"btn_ard_{id_sel}"):
-                    try:
-                        st.session_state.plage[id_sel]["conso_ardoise"] = \
-                            st.session_state.plage[id_sel].get("conso_ardoise", 0.0) + prix_unitaire
-                        st.session_state.plage[id_sel]["historique_conso"].append(f"{produit_choisi} (Ardoise)")
-                        st.session_state.stocks[produit_choisi] = st.session_state.stocks.get(produit_choisi, 0) - 1
-                        nouvelle_conso = {
-                            "article": produit_choisi,
-                            "quantite": 1,
-                            "prix_total": prix_unitaire,
-                            "numero_transat_associe": id_sel,
-                            "date": date_plan.isoformat()
-                        }
-                        supabase.table("consommations").insert(nouvelle_conso).execute()
-                    except Exception:
-                        pass
+                if col_f2.button("Fermer", key=f"fermer_{id_sel}"):
+                    st.session_state.groupe_selectionne = None
                     safe_rerun()
-            with col_btn_dir:
-                if st.button("⚡ Encaisser Direct", key=f"btn_dir_{id_sel}"):
-                    try:
-                        st.session_state.ca_jour = st.session_state.get("ca_jour", 0.0) + prix_unitaire
-                        st.session_state.plage[id_sel]["paye_direct"] = \
-                            st.session_state.plage[id_sel].get("paye_direct", 0.0) + prix_unitaire
-                        st.session_state.plage[id_sel]["historique_paye_direct"].append(f"{produit_choisi} (Direct)")
-                        st.session_state.stocks[produit_choisi] = st.session_state.stocks.get(produit_choisi, 0) - 1
-                        nouvelle_conso = {
-                            "article": produit_choisi,
-                            "quantite": 1,
-                            "prix_total": prix_unitaire,
-                            "date": date_plan.isoformat()
-                        }
-                        supabase.table("consommations").insert(nouvelle_conso).execute()
-                    except Exception:
-                        pass
-                    safe_rerun()
-
-            if info_local.get("historique_conso") or info_local.get("historique_paye_direct"):
-                with st.expander("👀 Voir le détail des consos"):
-                    if info_local.get("historique_conso"):
-                        st.write("**Sur l'Ardoise :**")
-                        for c in info_local["historique_conso"]:
-                            st.text(f" ⏳ {c}")
-                    if info_local.get("historique_paye_direct"):
-                        st.write("**Déjà payé en direct :**")
-                        for c in info_local["historique_paye_direct"]:
-                            st.text(f" ✅ {c}")
-
-            st.write("---")
-            transats_dus = 0.0 if info_local.get("transats_payes", False) else frais_transats
-            total_du_final = transats_dus + info_local.get("conso_ardoise", 0.0)
-            st.markdown(
-                f"<div class='paye-direct-display'>DÉJÀ ENCAISSÉ EN DIRECT : {info_local.get('paye_direct', 0.0) + info_local.get('prix_transats_encaisse', 0.0):.2f} €</div>",
-                unsafe_allow_html=True)
-            st.markdown(
-                f"<div class='total-display'>RESTE À PAYER AU DÉPART : {total_du_final:.2f} €</div>",
-                unsafe_allow_html=True)
-
-            col_f1, col_f2 = st.columns(2)
-            if col_f1.button("💵 ENCAISSER RESTE & LIBÉRER", key=f"liberer_{id_sel}"):
-                try:
-                    st.session_state.ca_jour = st.session_state.get("ca_jour", 0.0) + total_du_final
-                    supabase.table("transats").update({
-                        "prix": info_local.get('prix_transats_encaisse', 0.0) + transats_dus,
-                        "statut_paiement": "Libre"
-                    }).eq("date", date_plan.isoformat()).eq("numero_transat", id_sel).execute()
-                except Exception:
-                    pass
-                st.session_state.plage[id_sel] = {
-                    "statut": "Libre", "client": "", "heure_arrivee": "", "nb_transats": 2,
-                    "transats_payes": False, "prix_transats_encaisse": 0.0, "conso_ardoise": 0.0,
-                    "historique_conso": [], "paye_direct": 0.0, "historique_paye_direct": []
-                }
-                st.session_state.groupe_selectionne = None
-                safe_rerun()
-            if col_f2.button("Fermer", key=f"fermer_{id_sel}"):
-                st.session_state.groupe_selectionne = None
-                safe_rerun()
 
 # ---------------------------
 # RÉSERVATIONS
@@ -418,7 +432,7 @@ elif page == "📅 Réservations":
         transats_resa = st.number_input("Nombre de transats", min_value=1, max_value=4, value=2, key="resa_transats")
         periode_resa = st.selectbox("Période", ["Matin", "Journée", "Après-midi"], key="resa_periode")
         if st.button("Enregistrer la réservation"):
-            date_clef = date_resa.strftime("%d/%m/%Y")
+            date_clef = date_to_key(date_resa)
             if date_clef not in st.session_state.reservations:
                 st.session_state.reservations[date_clef] = []
             nouvelle = {
@@ -428,7 +442,9 @@ elif page == "📅 Réservations":
                 "enfants": bool(enfants),
                 "transats": transats_resa,
                 "periode": periode_resa,
-                "assigned_place": None
+                "assigned_place": None,
+                "assigned_date": None,
+                "heure_arrivee": None
             }
             st.session_state.reservations[date_clef].append(nouvelle)
             try:
@@ -447,75 +463,70 @@ elif page == "📅 Réservations":
             st.success("Réservation ajoutée.")
             safe_rerun()
 
+    # Liste et mini-plan pour assigner les réservations
     with col_list:
         st.markdown("### 📋 Réservations enregistrées")
         date_affiche = st.date_input("Date affichée", value=datetime.now().date(), key="resa_date_affiche")
-        date_affiche_clef = date_affiche.strftime("%d/%m/%Y")
+        date_affiche_clef = date_to_key(date_affiche)
 
-        show_plan = st.checkbox("Afficher le plan des emplacements pour cette date")
-        if show_plan:
-            st.markdown("#### Plan des emplacements (cliquer sur une place)")
-            cols_per_line = [1,1,1,1,1,0.4,1,1,1,1,1]
-            for l in range(1, 8):
-                row_cols = st.columns(cols_per_line)
-                for g in range(1, 6):
-                    id_c = f"L{l}-G{g}"
-                    assigned = any(
-                        r.get("assigned_place") == id_c
-                        for r in st.session_state.reservations.get(date_affiche_clef, [])
-                    )
-                    label = f"🟡\n{l}-{g}" if assigned else f"⚪\n{l}-{g}"
-                    if row_cols[g-1].button(label, key=f"resa_plan_{id_c}"):
-                        st.session_state.resa_plan_place_selected = id_c
-                        safe_rerun()
-                with row_cols[5]:
-                    st.markdown("<div class='allee-verticale'>ALLÉE</div>", unsafe_allow_html=True)
-                for g in range(6, 11):
-                    id_c = f"L{l}-G{g}"
-                    assigned = any(
-                        r.get("assigned_place") == id_c
-                        for r in st.session_state.reservations.get(date_affiche_clef, [])
-                    )
-                    label = f"🟡\n{l}-{g}" if assigned else f"⚪\n{l}-{g}"
-                    if row_cols[g].button(label, key=f"resa_plan_{id_c}_r"):
-                        st.session_state.resa_plan_place_selected = id_c
-                        safe_rerun()
+        # Mini-plan au dessus de la liste pour placer les réservés (même structure)
+        st.markdown("#### Mini‑plan pour assigner les réservations")
+        cols_per_line = [1,1,1,1,1,0.4,1,1,1,1,1]
+        for l in range(1, 8):
+            row_cols = st.columns(cols_per_line)
+            for g in range(1, 6):
+                id_c = f"L{l}-G{g}"
+                assigned = any(
+                    r.get("assigned_place") == id_c and r.get("assigned_date") == date_affiche_clef
+                    for r in st.session_state.reservations.get(date_affiche_clef, [])
+                )
+                label = f"🟡\n{l}-{g}" if assigned else f"⚪\n{l}-{g}"
+                if row_cols[g-1].button(label, key=f"resa_plan_{id_c}"):
+                    st.session_state.resa_plan_place_selected = id_c
+                    safe_rerun()
+            with row_cols[5]:
+                st.markdown("<div class='allee-verticale'>ALLÉE</div>", unsafe_allow_html=True)
+            for g in range(6, 11):
+                id_c = f"L{l}-G{g}"
+                assigned = any(
+                    r.get("assigned_place") == id_c and r.get("assigned_date") == date_affiche_clef
+                    for r in st.session_state.reservations.get(date_affiche_clef, [])
+                )
+                label = f"🟡\n{l}-{g}" if assigned else f"⚪\n{l}-{g}"
+                if row_cols[g].button(label, key=f"resa_plan_{id_c}_r"):
+                    st.session_state.resa_plan_place_selected = id_c
+                    safe_rerun()
 
-            if st.session_state.resa_plan_place_selected:
-                place_sel = st.session_state.resa_plan_place_selected
-                st.write("---")
-                st.markdown(f"#### Réservations pour la place {place_sel} ({date_affiche_clef})")
-                listes = st.session_state.reservations.get(date_affiche_clef, [])
-                candidats = []
-                for idx, rr in enumerate(listes):
-                    if rr.get("assigned_place") in (None, place_sel):
-                        candidats.append((idx, rr))
-                if not candidats:
-                    st.info("Aucune réservation correspondante pour cette place.")
-                else:
-                    for idx, rr in candidats:
-                        st.write(
-                            f"- **{rr.get('client','-')}** — {rr.get('transats')} transats — Préf: {rr.get('preference')} — "
-                            f"Tel: {rr.get('telephone','-')} — Enfants: {'Oui' if rr.get('enfants') else 'Non'} — "
-                            f"Emplacement: {rr.get('assigned_place') or 'Non assigné'}"
-                        )
-                        col1, col2 = st.columns([1,1])
-                        if col1.button("Assigner ici", key=f"assign_here_{place_sel}_{idx}"):
-                            st.session_state.reservations[date_affiche_clef][idx]["assigned_place"] = place_sel
-                            try:
-                                rep = supabase.table("reservations").select("*") \
-                                    .eq("date", date_affiche.isoformat()) \
-                                    .eq("nom_client", rr.get("client")).execute()
-                                rows = rep.data or []
-                                if rows:
-                                    supabase.table("reservations").update({"assigned_place": place_sel}) \
-                                        .eq("id", rows[0].get("id")).execute()
-                            except Exception:
-                                pass
-                            st.success(f"{rr.get('client')} assigné(e) à {place_sel}.")
-                            safe_rerun()
-                        if col2.button("Voir détails", key=f"voir_det_{place_sel}_{idx}"):
-                            st.write(rr)
+        # Si une place du mini-plan est sélectionnée, afficher les réservations candidates pour assignation
+        if st.session_state.resa_plan_place_selected:
+            place_sel = st.session_state.resa_plan_place_selected
+            st.write("---")
+            st.markdown(f"#### Réservations candidates pour la place {place_sel} ({date_affiche_clef})")
+            listes = st.session_state.reservations.get(date_affiche_clef, [])
+            candidats = []
+            for idx, rr in enumerate(listes):
+                # on propose les réservations non assignées ou déjà assignées à cette place
+                if rr.get("assigned_place") in (None, place_sel):
+                    candidats.append((idx, rr))
+            if not candidats:
+                st.info("Aucune réservation correspondante pour cette place.")
+            else:
+                for idx, rr in candidats:
+                    st.write(
+                        f"- **{rr.get('client','-')}** — {rr.get('transats')} transats — Préf: {rr.get('preference')} — "
+                        f"Tel: {rr.get('telephone','-')} — Enfants: {'Oui' if rr.get('enfants') else 'Non'} — "
+                        f"Emplacement: {rr.get('assigned_place') or 'Non assigné'}"
+                    )
+                    col1, col2 = st.columns([1,1])
+                    if col1.button("Assigner ici", key=f"assign_here_{place_sel}_{idx}"):
+                        # assigner la réservation à la place pour la date affichée
+                        st.session_state.reservations[date_affiche_clef][idx]["assigned_place"] = place_sel
+                        st.session_state.reservations[date_affiche_clef][idx]["assigned_date"] = date_affiche_clef
+                        # on peut aussi stocker heure d'arrivée prévue si besoin
+                        st.success(f"{rr.get('client')} assigné(e) à {place_sel} pour le {date_affiche_clef}.")
+                        safe_rerun()
+                    if col2.button("Voir détails", key=f"voir_det_{place_sel}_{idx}"):
+                        st.write(rr)
 
         st.write("---")
         st.markdown(f"### Réservations pour {date_affiche_clef}")
@@ -535,6 +546,7 @@ elif page == "📅 Réservations":
                 if col_a.button("Annuler", key=f"annuler_resa_{date_affiche_clef}_{i}"):
                     resa = st.session_state.reservations[date_affiche_clef].pop(i)
                     try:
+                        # tentative suppression côté supabase si présent
                         rep = supabase.table("reservations").select("*") \
                             .eq("date", date_affiche.isoformat()) \
                             .eq("nom_client", resa["client"]).execute()
@@ -546,323 +558,128 @@ elif page == "📅 Réservations":
                     st.success("Réservation annulée.")
                     safe_rerun()
 
-                if col_b.button("Modifier préférence / infos", key=f"modif_resa_{date_affiche_clef}_{i}"):
-                    new_pref = st.selectbox("Nouvelle préférence", ["1er rang", "Allée", "Corde"],
-                                            key=f"mod_pref_{date_affiche_clef}_{i}")
-                    new_tel = st.text_input("Téléphone", value=r.get("telephone", ""),
-                                            key=f"mod_tel_{date_affiche_clef}_{i}")
-                    new_enf = st.checkbox("Enfants ?", value=r.get("enfants", False),
-                                          key=f"mod_enf_{date_affiche_clef}_{i}")
-                    new_trans = st.number_input("Nombre de transats", min_value=1, max_value=4,
-                                                value=r.get("transats", 2),
-                                                key=f"mod_trans_{date_affiche_clef}_{i}")
-                    if st.button("Valider modification", key=f"valider_modif_{date_affiche_clef}_{i}"):
-                        st.session_state.reservations[date_affiche_clef][i].update({
-                            "preference": new_pref,
-                            "telephone": new_tel,
-                            "enfants": bool(new_enf),
-                            "transats": new_trans
-                        })
-                        try:
-                            rep = supabase.table("reservations").select("*") \
-                                .eq("date", date_affiche.isoformat()) \
-                                .eq("nom_client", r.get("client")).execute()
-                            rows = rep.data or []
-                            if rows:
-                                supabase.table("reservations").update({
-                                    "preference": new_pref,
-                                    "telephone": new_tel,
-                                    "enfants": bool(new_enf),
-                                    "transats": new_trans
-                                }).eq("id", rows[0].get("id")).execute()
-                        except Exception:
-                            pass
-                        st.success("Modification enregistrée.")
-                        safe_rerun()
-
-                if col_c.button("Placer sur le plan", key=f"placer_resa_{date_affiche_clef}_{i}"):
-                    st.markdown(f"#### Placer {r.get('client')} sur le plan")
-                    pref = r.get("preference")
-                    candidates = []
-                    if pref == "1er rang":
-                        for g in range(1, 11):
-                            candidates.append(f"L1-G{g}")
-                    elif pref == "Allée":
-                        for l in range(1, 8):
-                            candidates.append(f"L{l}-G6")
-                    else:
-                        for g in range(1, 11):
-                            candidates.append(f"L7-G{g}")
-                    free_candidates = [c for c in candidates
-                                       if st.session_state.plage.get(c, {}).get("statut", "Libre") == "Libre"]
-                    if free_candidates:
-                        sel_place = st.selectbox("Choisir un emplacement proposé", free_candidates,
-                                                 key=f"sel_place_pref_{date_affiche_clef}_{i}")
-                    else:
-                        all_free = [k for k, v in st.session_state.plage.items()
-                                    if v.get("statut", "Libre") == "Libre"]
-                        if not all_free:
-                            st.info("Aucune place libre.")
-                            sel_place = None
-                        else:
-                            sel_place = st.selectbox("Choisir une place libre", all_free,
-                                                     key=f"sel_place_any_{date_affiche_clef}_{i}")
-                    if st.button("Valider placement", key=f"valider_placement_{date_affiche_clef}_{i}"):
-                        if sel_place:
-                            st.session_state.reservations[date_affiche_clef][i]["assigned_place"] = sel_place
-                            plan_date = st.session_state.get("date_plan", date_affiche)
-                            if isinstance(plan_date, date):
-                                plan_clef = plan_date.strftime("%d/%m/%Y")
-                            else:
-                                plan_clef = date_affiche_clef
-                            if date_affiche_clef == plan_clef:
-                                st.session_state.plage[sel_place].update({
-                                    "statut": "Occupé",
-                                    "client": r.get("client", ""),
-                                    "nb_transats": r.get("transats", 2),
-                                    "heure_arrivee": "09:00",
-                                    "transats_payes": False,
-                                    "prix_transats_encaisse": 0.0,
-                                    "conso_ardoise": 0.0,
-                                    "historique_conso": [],
-                                    "paye_direct": 0.0,
-                                    "historique_paye_direct": []
-                                })
+                if col_b.button("Modifier", key=f"modif_resa_{date_affiche_clef}_{i}"):
+                    # affichage d'un petit formulaire inline pour modification
+                    with st.expander(f"Modifier {r.get('client')}"):
+                        new_pref = st.selectbox("Nouvelle préférence", ["1er rang", "Allée", "Corde"],
+                                                index=["1er rang","Allée","Corde"].index(r.get("preference","1er rang")),
+                                                key=f"mod_pref_{date_affiche_clef}_{i}")
+                        new_tel = st.text_input("Téléphone", value=r.get("telephone", ""), key=f"mod_tel_{date_affiche_clef}_{i}")
+                        new_enf = st.checkbox("Enfants ?", value=r.get("enfants", False), key=f"mod_enf_{date_affiche_clef}_{i}")
+                        new_trans = st.number_input("Nombre de transats", min_value=1, max_value=4,
+                                                    value=r.get("transats", 2),
+                                                    key=f"mod_trans_{date_affiche_clef}_{i}")
+                        if st.button("Valider modification", key=f"valider_modif_{date_affiche_clef}_{i}"):
+                            st.session_state.reservations[date_affiche_clef][i].update({
+                                "preference": new_pref,
+                                "telephone": new_tel,
+                                "enfants": bool(new_enf),
+                                "transats": new_trans
+                            })
                             try:
+                                # tentative update supabase
                                 rep = supabase.table("reservations").select("*") \
                                     .eq("date", date_affiche.isoformat()) \
                                     .eq("nom_client", r.get("client")).execute()
                                 rows = rep.data or []
                                 if rows:
-                                    supabase.table("reservations").update({"assigned_place": sel_place}) \
-                                        .eq("id", rows[0].get("id")).execute()
-                                rep_t = supabase.table("transats").select("*") \
-                                    .eq("date", date_affiche.isoformat()) \
-                                    .eq("numero_transat", sel_place).execute()
-                                rows_t = rep_t.data or []
-                                if rows_t:
-                                    supabase.table("transats").update({
-                                        "nom_client": r.get("client", ""),
-                                        "periode": r.get("periode", "Journée"),
-                                        "prix": 0.0,
-                                        "statut_paiement": "Occupé"
-                                    }).eq("id", rows_t[0].get("id")).execute()
-                                else:
-                                    supabase.table("transats").insert({
-                                        "date": date_affiche.isoformat(),
-                                        "numero_transat": sel_place,
-                                        "nom_client": r.get("client", ""),
-                                        "periode": r.get("periode", "Journée"),
-                                        "prix": 0.0,
-                                        "statut_paiement": "Occupé"
-                                    }).execute()
+                                    supabase.table("reservations").update({
+                                        "preference": new_pref,
+                                        "telephone": new_tel,
+                                        "enfants": bool(new_enf),
+                                        "transats": new_trans
+                                    }).eq("id", rows[0].get("id")).execute()
                             except Exception:
                                 pass
-                            st.success("Placement effectué.")
+                            st.success("Réservation modifiée.")
                             safe_rerun()
 
-# ---------------------------
-# CHIFFRE D'AFFAIRES
-# ---------------------------
-elif page == "📊 Chiffre d'Affaires":
-    st.markdown("<h3 style='text-align: center; color: #854d0e;'>📊 CHIFFRE D'AFFAIRES</h3>", unsafe_allow_html=True)
-    st.write("---")
-    col1, col2 = st.columns([2, 1])
-    with col1:
-        st.metric("CA (jour)", f"{st.session_state.get('ca_jour', 0.0):.2f} €")
-        st.write("Détail des encaissements par emplacement :")
-        for id_c, info in st.session_state.plage.items():
-            total_encaisse = info.get("paye_direct", 0.0) + info.get("prix_transats_encaisse", 0.0)
-            if total_encaisse > 0:
-                st.write(f"- {id_c} : {info.get('client','-')} — {total_encaisse:.2f} €")
-    with col2:
-        if st.button("Sauvegarder CA du jour dans Supabase"):
-            try:
-                supabase.table("ca_journalier").insert({
-                    "date": aujourd_hui,
-                    "ca_total": float(st.session_state.get("ca_jour", 0.0))
-                }).execute()
-                st.success("CA sauvegardé.")
-            except Exception:
-                st.error("Erreur sauvegarde CA (vérifie la table ca_journalier).")
-        if st.button("Réinitialiser CA du jour (local)"):
-            st.session_state.ca_jour = 0.0
-            safe_rerun()
-    st.write("---")
-    st.markdown("### Historique (dernières entrées Supabase)")
-    try:
-        rep = supabase.table("ca_journalier").select("*").order("date", desc=True).limit(10).execute()
-        rows = rep.data or []
-        if rows:
-            for r in rows:
-                st.write(f"- {r.get('date')} : {r.get('ca_total', 0.0):.2f} €")
-        else:
-            st.info("Aucune donnée CA en base.")
-    except Exception:
-        st.info("Impossible de lire l'historique CA depuis Supabase.")
-
-# ---------------------------
-# RÉCAP JOURNALIER
-# ---------------------------
-elif page == "📊 Récap Journalier":
-    st.markdown("<h3 style='text-align: center; color: #854d0e;'>📊 RÉCAP JOURNALIER</h3>", unsafe_allow_html=True)
-    st.write("---")
-    date_sel = st.date_input("Choisir une date", value=datetime.now().date(), key="recap_date")
-    date_clef = date_sel.strftime("%Y-%m-%d")
-
-    st.markdown("#### Transats enregistrés (Supabase)")
-    try:
-        rep_t = supabase.table("transats").select("*").eq("date", date_clef).execute()
-        rows_t = rep_t.data or []
-        if rows_t:
-            for r in rows_t:
-                st.write(
-                    f"- {r.get('numero_transat')} | {r.get('nom_client','-')} | {r.get('statut_paiement','-')} | {r.get('prix', 0.0):.2f} €")
-        else:
-            st.info("Aucun transat enregistré pour cette date en base.")
-    except Exception:
-        st.info("Impossible de lire les transats depuis Supabase.")
-
-    st.write("---")
-    st.markdown("#### Consommations enregistrées (Supabase)")
-    try:
-        rep_c = supabase.table("consommations").select("*").eq("date", date_clef).execute()
-        rows_c = rep_c.data or []
-        if rows_c:
-            for c in rows_c:
-                st.write(
-                    f"- {c.get('article')} | qté: {c.get('quantite', 1)} | {c.get('prix_total', 0.0):.2f} € | transat: {c.get('numero_transat_associe','-')}")
-        else:
-            st.info("Aucune consommation enregistrée pour cette date en base.")
-    except Exception:
-        st.info("Impossible de lire les consommations depuis Supabase.")
+                if col_c.button("Assigner sur plan", key=f"assign_on_plan_{date_affiche_clef}_{i}"):
+                    # on ouvre un mini sélecteur de place pour assigner directement
+                    st.session_state.resa_plan_place_selected = None
+                    st.session_state._assign_target = (date_affiche_clef, i)
+                    st.info("Choisis une place dans le mini‑plan ci‑dessus pour assigner cette réservation.")
+                    safe_rerun()
 
 # ---------------------------
 # PÉDALOS
 # ---------------------------
 elif page == "🛶 Pédalos":
-    st.markdown("<h3 style='text-align: center; color: #854d0e;'>🛶 GESTION DE LA FLOTTE DE PÉDALOS</h3>", unsafe_allow_html=True)
+    st.markdown("<h3 style='text-align: center; color: #854d0e;'>🛶 PÉDALOS</h3>", unsafe_allow_html=True)
     st.write("---")
-    for idx, (p_id, p_info) in enumerate(st.session_state.pedalos.items()):
-        with st.container():
-            col_p1, col_p2, col_p3 = st.columns([2, 4, 3])
-            with col_p1:
-                if p_info["statut"] == "Disponible":
-                    st.markdown(f"### 🔵 {p_id}")
-                    st.success("Disponible")
-                else:
-                    st.markdown(f"### 🛶 {p_id}")
-                    st.error("En Mer")
-            with col_p2:
-                if p_info["statut"] == "Disponible":
-                    nom_p = st.text_input("Nom du client :", key=f"nom_{p_id}", placeholder="Ex: Lucas")
-                    duree_p = st.radio("Durée demandée :", ["30 min (15€)", "1h (20€)"],
-                                       key=f"dur_{p_id}", horizontal=True)
-                    h_dep_p = st.text_input("Heure de départ :", datetime.now().strftime("%H:%M"),
-                                            key=f"hdep_{p_id}")
-                else:
-                    st.markdown(f"👤 **Client :** {p_info['client']}")
-                    st.markdown(
-                        f"⏰ **Départ :** {p_info['heure_depart']} | **Forfait :** {p_info['duree_prevue']}")
-                    st.markdown(f"💰 **Montant à régler :** {p_info['total_du']:.2f} €")
-            with col_p3:
-                st.write("")
-                if p_info["statut"] == "Disponible":
-                    if st.button("🚀 Mettre à l'eau", key=f"btn_l_{p_id}", use_container_width=True):
-                        if st.session_state.get(f"nom_{p_id}", ""):
-                            nom_val = st.session_state.get(f"nom_{p_id}")
-                            prix_p = 15.0 if "30 min" in st.session_state.get(f"dur_{p_id}", "") else 20.0
-                            st.session_state.pedalos[p_id].update({
-                                "statut": "En Mer",
-                                "client": nom_val,
-                                "heure_depart": h_dep_p,
-                                "duree_prevue": st.session_state.get(f"dur_{p_id}", "1h"),
-                                "total_du": prix_p
-                            })
-                            safe_rerun()
-                        else:
-                            st.error("Entrez un nom")
-                else:
-                    if st.button("💵 Retour & Encaisser", key=f"btn_r_{p_id}", use_container_width=True):
-                        st.session_state.ca_jour += p_info["total_du"]
-                        st.session_state.pedalos[p_id].update({
-                            "statut": "Disponible",
-                            "client": "",
-                            "heure_depart": "",
-                            "duree_prevue": "1h",
-                            "total_du": 0.0
-                        })
-                        safe_rerun()
-        if idx < len(st.session_state.pedalos) - 1:
-            st.markdown("---")
-
-# ---------------------------
-# NOTES
-# ---------------------------
-elif page == "📝 Notes (To-Do List)":
-    st.markdown("<h3 style='color: #854d0e;'>📝 Cahier de Liaison & Besoins</h3>", unsafe_allow_html=True)
-    col_note, col_btn = st.columns([4, 1])
-    nouvelle_note = col_note.text_input("Nouvelle tâche :", placeholder="Ex: Nettoyer la ligne 3")
-    if col_btn.button("Ajouter"):
-        if nouvelle_note:
-            st.session_state.notes.append(nouvelle_note)
-            safe_rerun()
-    st.write("---")
-    notes_a_supprimer = []
-    for i, note in enumerate(st.session_state.notes):
-        if st.checkbox(note, key=f"note_{i}"):
-            notes_a_supprimer.append(i)
-    if notes_a_supprimer:
-        for i in reversed(notes_a_supprimer):
-            st.session_state.notes.pop(i)
-        safe_rerun()
+    # Affichage simple avec séparation entre pédalos
+    for idx, (k, v) in enumerate(st.session_state.pedalos.items(), start=1):
+        st.markdown(f"**{k}** — {v.get('statut','Disponible')} — Client: {v.get('client','-')}")
+        st.markdown("<div class='pedalo-sep'></div>", unsafe_allow_html=True)
 
 # ---------------------------
 # STOCKS & FRIGOS
 # ---------------------------
 elif page == "📦 Stocks & Frigos":
-    st.markdown("<h3 style='color: #854d0e; text-align: center;'>📦 GESTION DES STOCKS & FRIGOS</h3>", unsafe_allow_html=True)
+    st.markdown("<h3 style='text-align: center; color: #854d0e;'>📦 STOCKS</h3>", unsafe_allow_html=True)
     st.write("---")
-    st.info("💡 Cet onglet sert uniquement à enregistrer les livraisons (Réassort). Les stocks diminuent automatiquement à chaque vente sur le plan de la plage.")
-    col_h1, col_h2, col_h3 = st.columns([3, 1.5, 2])
-    with col_h1:
-        st.markdown("**Produit**")
-    with col_h2:
-        st.markdown("**Quantité en réserve**")
-    with col_h3:
-        st.markdown("**Actions**")
-    st.write("---")
-
-    for produit in TARIFS_CONSO.keys():
-        if produit not in st.session_state.stocks:
-            st.session_state.stocks[produit] = 0
-        quantite_actuelle = st.session_state.stocks[produit]
-
-        col_nom, col_qte, col_actions = st.columns([3, 1.5, 2])
-        with col_nom:
-            st.write(f"🍹 {produit}")
-        with col_qte:
-            if st.button(str(quantite_actuelle), key=f"qte_btn_{produit}"):
-                st.write(f"Modifier le stock de {produit}")
-                new_q = st.number_input("Nouvelle quantité", min_value=0, value=quantite_actuelle,
-                                        key=f"new_q_{produit}")
-                if st.button("Valider", key=f"valider_q_{produit}"):
-                    st.session_state.stocks[produit] = int(new_q)
+    for key in list(st.session_state.stocks.keys()):
+        col1, col2 = st.columns([2,1])
+        with col1:
+            st.write(f"**{key}**")
+        with col2:
+            # boutons -1, +1, +10
+            c1, c2, c3, c4 = st.columns([1,1,1,1])
+            if c1.button("-1", key=f"stock_minus1_{key}"):
+                st.session_state.stocks[key] = max(0, st.session_state.stocks.get(key,0) - 1)
+                safe_rerun()
+            if c2.button("+1", key=f"stock_plus1_{key}"):
+                st.session_state.stocks[key] = st.session_state.stocks.get(key,0) + 1
+                safe_rerun()
+            if c3.button("+10", key=f"stock_plus10_{key}"):
+                st.session_state.stocks[key] = st.session_state.stocks.get(key,0) + 10
+                safe_rerun()
+            # clic sur le nombre pour modifier précisément
+            if c4.button(f"{st.session_state.stocks.get(key,0)}", key=f"stock_set_{key}"):
+                # ouvrir modal pour entrer la valeur précise
+                val = st.number_input(f"Entrer la quantité pour {key}", min_value=0, value=st.session_state.stocks.get(key,0), key=f"input_stock_{key}")
+                if st.button("Valider", key=f"valider_stock_{key}"):
+                    st.session_state.stocks[key] = int(val)
+                    st.success("Stock mis à jour.")
                     safe_rerun()
-        with col_actions:
-            btn_col1, btn_col2, btn_col3 = st.columns([1, 1, 1])
-            if btn_col1.button("➕ 1", key=f"plus1_{produit}"):
-                st.session_state.stocks[produit] += 1
-                safe_rerun()
-            if btn_col2.button("➕ 10", key=f"plus10_{produit}"):
-                st.session_state.stocks[produit] += 10
-                safe_rerun()
-            if btn_col3.button("➖ 1", key=f"minus1_{produit}"):
-                st.session_state.stocks[produit] = max(0, st.session_state.stocks[produit] - 1)
-                safe_rerun()
 
 # ---------------------------
-# DEFAULT
+# CHIFFRE D'AFFAIRES (simple)
+# ---------------------------
+elif page == "📊 Chiffre d'Affaires":
+    st.markdown("<h3 style='text-align: center; color: #854d0e;'>📊 CHIFFRE D'AFFAIRES</h3>", unsafe_allow_html=True)
+    st.write("---")
+    st.metric("CA du jour", f"{st.session_state.get('ca_jour',0.0):.2f} €")
+
+# ---------------------------
+# RÉCAP JOURNALIER (simple)
+# ---------------------------
+elif page == "📊 Récap Journalier":
+    st.markdown("<h3 style='text-align: center; color: #854d0e;'>📋 RÉCAP JOURNALIER</h3>", unsafe_allow_html=True)
+    st.write("---")
+    st.write("Notes et résumé rapide")
+    for n in st.session_state.notes:
+        st.write(f"- {n}")
+
+# ---------------------------
+# NOTES (To-Do)
+# ---------------------------
+elif page == "📝 Notes (To-Do List)":
+    st.markdown("<h3 style='text-align: center; color: #854d0e;'>📝 NOTES</h3>", unsafe_allow_html=True)
+    new_note = st.text_input("Nouvelle note", key="new_note")
+    if st.button("Ajouter note"):
+        if new_note:
+            st.session_state.notes.append(new_note)
+            st.success("Note ajoutée.")
+            safe_rerun()
+    for i, note in enumerate(st.session_state.notes):
+        st.write(f"- {note}  ", end="")
+        if st.button("Supprimer", key=f"del_note_{i}"):
+            st.session_state.notes.pop(i)
+            safe_rerun()
+
+# ---------------------------
+# FIN
 # ---------------------------
 else:
-    st.write("Page en construction ou non implémentée.")
+    st.write("Page non implémentée.")
