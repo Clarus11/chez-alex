@@ -1,79 +1,26 @@
-# ==============================================================================
-# PARTIE 1 : CONFIGURATION, SÉCURITÉ ET FONCTIONS LOGIQUES
-# ==============================================================================
 import streamlit as st
 from supabase import create_client
-from datetime import datetime, date
-import traceback
+from datetime import datetime, date, timedelta
 
-# 1. FALLBACK RERUN (Pour éviter les crashs de rafraîchissement)
-# 1. FALLBACK RERUN (Correction définitive du redémarrage)
-def safe_rerun():
-    if hasattr(st, "rerun"):
-        st.rerun()
-    else:
-        st.experimental_rerun()
-    st.session_state["_force_rerun_flag"] = not st.session_state.get("_force_rerun_flag", False)
+# ==============================================================================
+# 1. CONFIGURATION DE L'APPLICATION & INTERFACE
+# ==============================================================================
+st.set_page_config(page_title="Chez Alex 2026 — Gestion de Plage", page_icon="🏖️", layout="wide")
 
-# 2. GESTION DES ERREURS
-def safe_print_exception(prefix="Erreur"):
-    st.error(f"{prefix} — voir logs pour la trace complète.")
-    print(prefix)
-    traceback.print_exc()
-
-# 3. CALCULS DES TARIFS AUTOMATIQUES
-def calculer_tarif_heures(heure_arr, heure_dep, nb_transats):
-    try:
-        t1 = datetime.strptime(heure_arr, "%H:%M")
-        t2 = datetime.strptime(heure_dep, "%H:%M")
-        diff = t2 - t1
-        minutes = diff.total_seconds() / 60
-        if minutes < 0:
-            minutes = 0
-        heures = minutes / 60
-        
-        # Tarification dégressive : 6€/h la première heure, puis 4€/h
-        if heures <= 0:
-            prix_par_transat = 0
-        elif heures <= 1:
-            prix_par_transat = heures * 6
-        else:
-            prix_par_transat = 6 + (heures - 1) * 4
-            
-        return round(prix_par_transat * nb_transats, 2)
-    except Exception:
-        return 0.0
-
-# 4. CONFIGURATION DE LA PAGE & DESIGN CSS (Chez Alex)
-st.set_page_config(page_title="Chez Alex 2026", page_icon="🏖️", layout="wide")
-
+# Injection CSS pour le rendu de la grille de la plage et l'alignement responsive
 st.markdown("""
     <style>
-    /* Style général et fond de page */
     .stApp { background-color: #fdfaf3; }
-    
-    /* Alignement parfait de la grille des transats */
-    div[data-testid="stHorizontalBlock"] {
-        display: flex !important;
-        flex-wrap: nowrap !important;
-        gap: 4px !important;
-        align-items: center !important;
-        padding: 0 !important;
-    }
-    
-    /* Boutons de la grille des transats */
-    .stButton > button {
-        border-radius: 6px !important;
-        font-weight: bold !important;
-        padding: 6px 10px !important;
-        width: 100% !important;
-        transition: transform 0.1s ease;
-    }
-    .stButton > button:active { transform: scale(0.95); }
+    div[data-testid="stHorizontalBlock"] { display: flex !important; flex-wrap: nowrap !important; gap: 5px !important; align-items: center !important; padding: 0 !important; }
+    .stButton > button { border-radius: 6px !important; font-weight: bold !important; padding: 8px 4px !important; width: 100% !important; min-height: 60px !important; font-size: 11px !important; line-height: 1.2 !important; }
+    .stButton > button:hover { transform: scale(1.02); }
+    .allée-centrale { background-color: #fef08a; color: #854d0e; font-weight: bold; text-align: center; padding: 20px 1px; border-radius: 4px; font-size: 10px; writing-mode: vertical-lr; height: 60px; display: flex; align-items: center; justify-content: center; }
     </style>
     """, unsafe_allow_html=True)
 
-# 5. INITIALISATION DES CLIENTS ET CONNEXION SUPABASE
+# ==============================================================================
+# 2. CONNEXION REELES / BACKUP SUPABASE
+# ==============================================================================
 if "supabase_ready" not in st.session_state:
     st.session_state.supabase_ready = False
 
@@ -84,34 +31,71 @@ try:
         supabase = create_client(url, key)
         st.session_state.supabase_ready = True
     else:
-        st.warning("Secrets Supabase manquants. Mode simulation activé.")
-except Exception as e:
-    st.warning(f"Impossible de se connecter à Supabase : {e}. Mode simulation activé.")
+        st.warning("Mode Sauvegarde Locale Activé (Pas de clés Supabase).")
+except Exception:
+    st.warning("Mode Sauvegarde Locale Activé (Erreur de connexion).")
 
-# 6. INITIALISATION DES DONNÉES EN MÉMOIRE VOLATILE (Si Supabase absent)
-if "local_reservations" not in st.session_state:
-    st.session_state.local_reservations = [
-        {"id": 1, "client": "Famille Martin", "telephone": "0601020304", "transats": 2, "preference": "Ligne A", "emplacement": "A3", "est_place": True, "date_resa": str(date.today()), "statut": "Confirmé", "heure_arrivee": "10:00", "heure_depart": "18:00", "montant": 68.0, "notes": ""},
-        {"id": 2, "client": "Lucas Bernard", "telephone": "0611223344", "transats": 1, "preference": "Ombre", "emplacement": "", "est_place": False, "date_resa": str(date.today()), "statut": "Confirmé", "heure_arrivee": "14:00", "heure_depart": "17:00", "montant": 14.0, "notes": "Proche bord de l'eau"}
-    ]
+# ==============================================================================
+# 3. INITIALIZATION DES STATES (Mémoire vive de l'application)
+# ==============================================================================
+if "local_db" not in st.session_state:
+    st.session_state.local_db = []
+if "place_selectionnee" not in st.session_state:
+    st.session_state.place_selectionnee = None
+if "pedalo_selectionne" not in st.session_state:
+    st.session_state.pedalo_selectionne = None
 
 if "stocks" not in st.session_state:
-    st.session_state.stocks = {"Coca-Cola": 45, "Perrier": 30, "Ice Tea": 50, "Eau Minérale": 80, "Bière blonde": 60, "Glaces (Magnum)": 25, "Chips": 40}
+    st.session_state.stocks = {
+        "Coca-Cola": 50, "Coca-Cola Zero": 50, "Orangina": 40, "Schweppes Agrume": 40,
+        "Petite Eau": 100, "Grande Eau": 60, "Café / Thé": 200, "Virgin Mojito": 30, "Glace Artisanale": 45
+    }
 
 if "pedalos" not in st.session_state:
-    st.session_state.pedalos = {str(i): {"statut": "Disponible", "heure_depart": "", "duree": "", "client": ""} for i in range(1, 6)}
+    st.session_state.pedalos = {
+        str(i): {"statut": "Disponible", "heure_depart": "", "duree": "1h", "client": "", "compteur_raz": str(date.today())}
+        for i in range(1, 6)
+    }
 
-# 7. FONCTIONS DE CHARGEMENT ET SAUVEGARDE DES RÉSERVATIONS
+TARIFS_CONSO = {
+    "Coca-Cola": 2.50, "Coca-Cola Zero": 2.50, "Orangina": 2.50, "Schweppes Agrume": 2.50,
+    "Petite Eau": 1.50, "Grande Eau": 2.50, "Café / Thé": 1.00, "Virgin Mojito": 6.00, "Glace Artisanale": 3.80
+}
+
+# ==============================================================================
+# 4. ENGINE DE CALCUL TARIFAIRE STRICT (15€ / 12€ / 7€)
+# ==============================================================================
+def calculer_tarif_plage(heure_arr, heure_dep, nb_transats):
+    """Applique la tarification stricte : 2h = 7€, Demi-journée = 12€, Journée = 15€"""
+    try:
+        t1 = datetime.strptime(heure_arr.strip(), "%H:%M")
+        t2 = datetime.strptime(heure_dep.strip(), "%H:%M")
+        delta_heures = (t2 - t1).total_seconds() / 3600
+        
+        if delta_heures <= 0:
+            return 0.0
+        elif delta_heures <= 2.2: # Tolérance de 12 min incluse
+            tarif_unitaire = 7.0
+        elif delta_heures <= 4.5: # Demi-journée jusqu'à 4h30 de présence
+            tarif_unitaire = 12.0
+        else:
+            tarif_unitaire = 15.0
+            
+        return round(tarif_unitaire * int(nb_transats), 2)
+    except Exception:
+        return 0.0
+
+# ==============================================================================
+# 5. SYSTÈME DE SYNCHRONISATION DES FLUX DE DONNÉES
+# ==============================================================================
 def charger_reservations(date_cible):
     if st.session_state.supabase_ready:
         try:
             res = supabase.table("reservations").select("*").eq("date_resa", str(date_cible)).execute()
             return res.data or []
         except Exception:
-            safe_print_exception("Erreur lors de la récupération des données")
-            return [r for r in st.session_state.local_reservations if r["date_resa"] == str(date_cible)]
-    else:
-        return [r for r in st.session_state.local_reservations if r["date_resa"] == str(date_cible)]
+            return [r for r in st.session_state.local_db if r["date_resa"] == str(date_cible)]
+    return [r for r in st.session_state.local_db if r["date_resa"] == str(date_cible)]
 
 def sauvegarder_reservation(data):
     if st.session_state.supabase_ready:
@@ -119,478 +103,379 @@ def sauvegarder_reservation(data):
             if "id" in data and data["id"]:
                 supabase.table("reservations").update(data).eq("id", data["id"]).execute()
             else:
-                supabase.table("reservations").insert(data).execute()
-        except Exception:
-            safe_print_exception("Erreur lors de la sauvegarde")
+                res = supabase.table("reservations").insert(data).execute()
+                if res.data:
+                    data["id"] = res.data[0]["id"]
+        except Exception as e:
+            st.error(f"Erreur Supabase synchro : {e}")
+    
+    # Backup ou mode local systématique pour éviter les blocages de l'interface
+    if "id" in data and data["id"]:
+        for idx, r in enumerate(st.session_state.local_db):
+            if r.get("id") == data["id"]:
+                st.session_state.local_db[idx] = data
+                return
     else:
-        if "id" in data and data["id"]:
-            for i, r in enumerate(st.session_state.local_reservations):
-                if r["id"] == data["id"]:
-                    st.session_state.local_reservations[i] = data
-        else:
-            data["id"] = len(st.session_state.local_reservations) + 1
-            st.session_state.local_reservations.append(data)
+        data["id"] = len(st.session_state.local_db) + 1
+        st.session_state.local_db.append(data)
 
-def supprimer_reservation_db(id_resa):
-    if st.session_state.supabase_ready:
-        try:
-            supabase.table("reservations").delete().eq("id", id_resa).execute()
-        except Exception:
-            safe_print_exception("Erreur lors de la suppression")
-    else:
-        st.session_state.local_reservations = [r for r in st.session_state.local_reservations if r["id"] != id_resa]
-
-# 8. SYSTÈME DE SÉCURITÉ & AUTHENTIFICATION (Vérifié et validé)
+# ==============================================================================
+# 6. DOUBLE RIDEAU DE SÉCURITÉ ACCÈS COMPTOIR
+# ==============================================================================
 if "autorise" not in st.session_state:
     st.session_state.autorise = False
 
-mdp_secret = st.secrets.get("password", "alex2026")
-
 if not st.session_state.autorise:
-    st.markdown("<h2 style='text-align: center; color: #854d0e;'>🏖️ Chez Alex - Équipe</h2>", unsafe_allow_html=True)
-    col_l1, col_l2, col_l3 = st.columns([1, 2, 1])
-    with col_l2:
-        mdp = st.text_input("Mot de passe d'accès :", type="password")
-        if st.button("Ouvrir l'application 🔓", type="primary"):
-            if mdp == mdp_secret:
+    st.markdown("<h2 style='text-align: center; color: #854d0e; margin-top:100px;'>🏖️ CHEZ ALEX — ACCÈS COMPTOIR</h2>", unsafe_allow_html=True)
+    c1, c2, c3 = st.columns([1, 1.5, 1])
+    with c2:
+        mdp = st.text_input("Saisir le mot de passe d'administration :", type="password")
+        if st.button("Valider l'ouverture du poste de contrôle 🔓", type="primary"):
+            if mdp == st.secrets.get("password", "alex2026"):
                 st.session_state.autorise = True
-                safe_rerun()
+                st.rerun()
             else:
-                st.error("Mot de passe incorrect ❌")
+                st.error("Mot de passe incorrect — Accès refusé.")
     st.stop()
-
-# Si l'utilisateur arrive ici, c'est qu'il est connecté. Le code continue en Partie 2...
+    # ==============================================================================
+# 7. FILTRES DE NAVIGATION ET CONTRÔLE TEMPOREL
 # ==============================================================================
-# PARTIE 2 : BARRE DE NAVIGATION ET AFFICHAGE DES PAGES D'APPLICATION
-# ==============================================================================
-
-# 1. BARRE DE NAVIGATION LATÉRALE
 with st.sidebar:
-    st.markdown("<h2 style='color: #854d0e; text-align: center;'>🏖️ Chez Alex</h2>", unsafe_allow_html=True)
-    st.markdown("<p style='text-align: center; font-style: italic; color: #a16207;'>Saison 2026 — Équipe</p>", unsafe_allow_html=True)
+    st.markdown("<h2 style='color: #854d0e; text-align: center; margin-bottom:0;'>🏖️ CHEZ ALEX</h2>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align: center; font-size:12px; color:#a16207;'>Gestionnaire de Plage v3.5 (Stable)</p>", unsafe_allow_html=True)
     st.write("---")
-    
-    # Choix de la date de travail
-    date_travail = st.date_input("📅 Date de travail :", date.today())
-    
-    # Menu de navigation principal
-    page = st.radio(
-        "🗂️ Menu principal :",
-        ["🏖️ Plan de la plage", "📝 Réservations du jour", "🛶 Pédalos", "🍹 Stocks & Conso", "📊 Fin de journée"]
-    )
-    
-    st.write("---")
-    # Indicateur de connexion à la base de données
-    if st.session_state.supabase_ready:
-        st.success("⚡ Connecté à Supabase")
-    else:
-        st.warning("⚠️ Mode local temporaire")
+    date_travail = st.date_input("📆 Choisir la date d'exploitation :", date.today())
+    page = st.radio("📂 Navigation Modules :", ["🏖️ Plan de la plage", "📝 Registre Réservations", "🛶 Flotte Pédalos", "🍹 Suivi Stocks"])
 
-# Chargement instantané des réservations pour la date sélectionnée
+# Chargement dynamique des flux pour la date sélectionnée
 resas_du_jour = charger_reservations(date_travail)
 
 # ==============================================================================
-# PAGE 1 : 🏖️ PLAN DE LA PLAGE (Correction ultime : Injection directe en mémoire)
+# MODULE 1 : 🏖️ PLAN DE LA PLAGE (REPRODUCTION ET MAILLAGE DES 140 PLACES)
 # ==============================================================================
 if page == "🏖️ Plan de la plage":
-    st.markdown(f"<h3 style='color: #854d0e; text-align: center;'>PLAN DU JOUR — {date_travail.strftime('%d/%m/%Y')}</h3>", unsafe_allow_html=True)
+    st.markdown(f"<h3 style='color: #854d0e; text-align: center;'>PLAN DIRECT DU COMPTOIR — {date_travail.strftime('%d/%m/%Y')}</h3>", unsafe_allow_html=True)
 
-    # Initialisation de la variable de sélection dans le session_state si elle n'existe pas
-    if "place_selectionnee" not in st.session_state:
-        st.session_state.place_selectionnee = None
-
-    # Liste d'attente pour le placement rapide
-    clients_en_attente = [r for r in resas_du_jour if not r.get("est_place")]
-
-    if clients_en_attente:
-        with st.expander(f"⚠️ Clients en attente de placement ({len(clients_en_attente)})", expanded=True):
-            for r in clients_en_attente:
-                col_c1, col_c2, col_c3 = st.columns([3, 2, 2])
-                with col_c1:
-                    st.write(f"👤 **{r['client']}** ({r['transats']} transat(s) — Préf: {r.get('preference', 'Aucune')})")
-                with col_c2:
-                    emplacement_choisi = st.text_input("Attribuer place(s) (ex: 1-1, 1-2) :", key=f"place_input_{r['id']}")
-                with col_c3:
-                    if st.button("Installer ✅", key=f"install_btn_{r['id']}", type="primary"):
-                        if emplacement_choisi.strip():
-                            liste_places_propres = ",".join([p.strip() for p in emplacement_choisi.split(",") if p.strip()])
-                            
-                            # 1. MODIFICATION FORCEE ET IMMEDIATE DANS LA LISTE EN MEMOIRE
-                            r["emplacement"] = liste_places_propres
-                            r["est_place"] = True
-                            
-                            # 2. ENREGISTREMENT DANS LA BASE
-                            sauvegarder_reservation(r)
-                            
-                            # 3. ON FORCE LA SELECTION DU TRANSAT POUR OUVRIR LA FICHE
-                            premiere_place = [p.strip() for p in liste_places_propres.split(",") if p.strip()][0]
-                            st.session_state.place_selectionnee = premiere_place
-                            
-                            st.success(f"{r['client']} installé en {liste_places_propres} !")
-                            safe_rerun()
-                        else:
-                            st.error("Indiquez un numéro.")
-
-    st.write("---")
-    
-    # CARTOGRAPHIE DE L'OCCUPATION (Calculée juste avant l'affichage de la grille)
+    # Cartographie temps réel de l'occupation
     occupation_transats = {}
     for r in resas_du_jour:
         if r.get("est_place") and r.get("emplacement"):
             places = [p.strip() for p in str(r["emplacement"]).split(",") if p.strip()]
             for p in places:
                 occupation_transats[p] = r
+
+    # Traitement prioritaire de la liste d'attente
+    clients_en_attente = [r for r in resas_du_jour if not r.get("est_place")]
+    if clients_en_attente:
+        with st.expander(f"⚠️ RÉSÈRVATIONS À PLACER AUJOURD'HUI ({len(clients_en_attente)})", expanded=True):
+            for r in clients_en_attente:
+                col_c1, col_c2, col_c3 = st.columns([3, 2, 2])
+                with col_c1:
+                    st.markdown(f"👤 **{r['client']}** — {r['transats']} transat(s) requis (Préf: *{r.get('preference') or 'Aucune'}*)")
+                with col_c2:
+                    emplacement_choisi = st.text_input("Attribuer Emplacement(s) (Ex: 1-1, 1-2) :", key=f"input_at_{r['id']}")
+                with col_c3:
+                    if st.button("Assigner & Installer ✅", key=f"btn_at_{r['id']}", type="primary"):
+                        if emplacement_choisi.strip():
+                            liste_propres = ",".join([p.strip() for p in emplacement_choisi.split(",") if p.strip()])
+                            r["emplacement"] = liste_propres
+                            r["est_place"] = True
+                            sauvegarder_reservation(r)
+                            st.session_state.place_selectionnee = liste_propres.split(",")[0]
+                            st.rerun()
+                        else:
+                            st.error("Renseignez un numéro de place.")
+
+    st.write("---")
     
-    # Génération de la grille au format 1-1 jusqu'à 7-10
+    # Rendu Graphique des 7 lignes x 10 Emplacements Doubles = 140 Transats Max
     for l in range(1, 8):
-        st.caption(f"Ligne {l}")
+        st.caption(f"LIGNE DE PLAGE {l}")
         cols_grille = st.columns([1, 1, 1, 1, 1, 0.4, 1, 1, 1, 1, 1])
         
-        # Transats 1 à 5 (Gauche de l'allée)
+        # Secteur Ouest : Emplacements 1 à 5
         for g in range(1, 6):
             nom_place = f"{l}-{g}"
             with cols_grille[g - 1]:
                 if nom_place in occupation_transats:
-                    label = f"🔴\n{occupation_transats[nom_place]['client']}"
+                    if st.button(f"🔴\n{occupation_transats[nom_place]['client'][:11]}", key=f"bt_{nom_place}"):
+                        st.session_state.place_selectionnee = nom_place
+                        st.rerun()
                 else:
-                    label = f"🟢\n{l}-{g}"
-                if st.button(label, key=f"btn_grid_{nom_place}"):
-                    st.session_state.place_selectionnee = nom_place
-                    safe_rerun()
-                    
-        # Allée centrale
+                    if st.button(f"🟢\n{nom_place}", key=f"bt_{nom_place}"):
+                        st.session_state.place_selectionnee = nom_place
+                        st.rerun()
+                        
+        # Couloir d'accès technique / Allée centrale
         with cols_grille[5]:
-            st.markdown("<div style='background-color: #fef08a; color: #854d0e; font-weight: bold; text-align: center; padding: 10px 1px; border-radius: 4px; font-size: 9px; writing-mode: vertical-lr; height: 55px; display: flex; align-items: center; justify-content: center;'>ALLÉE</div>", unsafe_allow_html=True)
+            st.markdown("<div class='allée-centrale'>ALLÉE</div>", unsafe_allow_html=True)
             
-        # Transats 6 à 10 (Droite de l'allée)
+        # Secteur Est : Emplacements 6 à 10
         for g in range(6, 11):
             nom_place = f"{l}-{g}"
             with cols_grille[g]:
                 if nom_place in occupation_transats:
-                    label = f"🔴\n{occupation_transats[nom_place]['client']}"
+                    if st.button(f"🔴\n{occupation_transats[nom_place]['client'][:11]}", key=f"bt_{nom_place}"):
+                        st.session_state.place_selectionnee = nom_place
+                        st.rerun()
                 else:
-                    label = f"🟢\n{l}-{g}"
-                if st.button(label, key=f"btn_grid_{nom_place}"):
-                    st.session_state.place_selectionnee = nom_place
-                    safe_rerun()
+                    if st.button(f"🟢\n{nom_place}", key=f"bt_{nom_place}"):
+                        st.session_state.place_selectionnee = nom_place
+                        st.rerun()
 
     # ==============================================================================
-    # LE SYSTÈME DE GESTION COMPLET AU CLIC
+    # PANNEAU DE CONTRÔLE DYNAMIQUE DU TRANSAT SÉLECTIONNÉ
     # ==============================================================================
     if st.session_state.place_selectionnee:
         id_sel = st.session_state.place_selectionnee
         st.write("---")
-        st.markdown(f"### 🗂️ Gestion de l'Emplacement **{id_sel}**")
+        st.markdown(f"### 🗂️ Panneau Électronique de l'Emplacement **{id_sel}**")
         
-        TARIFS_CONSO = {
-            "Coca-Cola": 2.50, "Coca-Cola Zero": 2.50, "Orangina": 2.50, "Schweppes Agrume": 2.50,
-            "Petite Eau": 1.50, "Grande Eau": 2.50, "Café / Thé": 1.00, "Virgin Mojito": 6.00, "Glace Artisanale": 3.80
-        }
-
-        # CAS 1 : L'emplacement sélectionné est LIBRE
+        # SCÉNARIO 1 : L'EMPLACEMENT SÉLECTIONNÉ EST DISPONIBLE
         if id_sel not in occupation_transats:
-            st.info(f"L'emplacement {id_sel} est libre. Vous pouvez y installer un client direct sans réservation préalable.")
-            
-            with st.form(f"form_installation_directe_{id_sel}"):
-                nom = st.text_input("👤 Nom du client :")
-                nb_t = st.number_input("🪑 Nombre de transats :", min_value=1, max_value=4, value=2)
-                h_a = st.text_input("⏰ Heure d'arrivée :", datetime.now().strftime("%H:%M"))
-                h_d = st.text_input("⏳ Heure de départ prévue :", "18:00")
-                notes_inst = st.text_area("Notes / Demandes spécifiques :")
+            st.info(f"L'emplacement {id_sel} ne possède aucune affectation. Enregistrement direct d'un client 'Passage' :")
+            with st.form(f"form_passage_{id_sel}"):
+                nom = st.text_input("👤 Nom complet du client :")
+                nb_t = st.number_input("🪑 Nombre de transats occupés sur ce spot :", min_value=1, max_value=2, value=2)
+                h_a = st.text_input("⏰ Heure d'installation :", datetime.now().strftime("%H:%M"))
+                h_d = st.text_input("⏳ Heure de libération prévue :", "18:00")
+                notes = st.text_area("Notes particulières :")
                 
-                if st.form_submit_button("✅ Installer le client en direct", type="primary"):
+                if st.form_submit_button("🚀 Lancer l'occupation immédiate", type="primary"):
                     if not nom.strip():
-                        st.error("Le nom du client est obligatoire.")
+                        st.error("Le nom du client de passage est requis.")
                     else:
-                        frais_estimés = calculer_tarif_heures(h_a, h_d, nb_t)
-                        nouvelle_resa_directe = {
-                            "client": nom.strip(),
-                            "telephone": "Client Direct",
-                            "transats": int(nb_t),
-                            "preference": "",
-                            "emplacement": id_sel,
-                            "est_place": True,
-                            "date_resa": str(date_travail),
-                            "statut": "Occupé",
-                            "heure_arrivee": h_a,
-                            "heure_depart": h_d,
-                            "montant": frais_estimés,
-                            "notes": notes_inst.strip(),
-                            "transats_payes": False,
-                            "conso_ardoise": 0.0,
-                            "paye_direct": 0.0
+                        frais = calculer_tarif_plage(h_a, h_d, nb_t)
+                        nouvelle_resa = {
+                            "client": nom.strip(), "telephone": "Passage", "transats": int(nb_t),
+                            "preference": "", "emplacement": id_sel, "est_place": True,
+                            "date_resa": str(date_travail), "statut": "Occupé",
+                            "heure_arrivee": h_a, "heure_depart": h_d, "montant": frais, "notes": notes.strip(),
+                            "transats_payes": False, "conso_ardoise": 0.0, "paye_direct": 0.0, "historique_conso": []
                         }
-                        sauvegarder_reservation(nouvelle_resa_directe)
-                        st.session_state.place_selectionnee = id_sel
-                        st.success(f"Client {nom} installé sur le transat {id_sel}.")
-                        safe_rerun()
+                        sauvegarder_reservation(nouvelle_resa)
+                        st.rerun()
                         
-        # CAS 2 : L'emplacement sélectionné est OCCUPÉ
+        # SCÉNARIO 2 : L'EMPLACEMENT EST OCCUPÉ — FICHE FINANCIÈRE ET FACTURATION COMPLÈTE
         else:
             client_local = occupation_transats[id_sel]
             
+            # Normalisation et sécurité des variables monétaires
             if "transats_payes" not in client_local: client_local["transats_payes"] = False
             if "conso_ardoise" not in client_local: client_local["conso_ardoise"] = 0.0
             if "paye_direct" not in client_local: client_local["paye_direct"] = 0.0
             if "historique_conso" not in client_local: client_local["historique_conso"] = []
 
-            st.markdown(f"👤 **Client :** {client_local['client']} | 🪑 **Total réservation :** {client_local['transats']} transat(s) | 📍 **Tous ses transats :** {client_local['emplacement']}")
-            st.markdown(f"⏰ **Arrivée :** {client_local['heure_arrivee']}")
-            if client_local.get("notes"):
-                st.caption(f"📝 *Note ou Consigne : {client_local['notes']}*")
-                
-            h_dep = st.text_input("⏳ Heure de départ réelle / ajustée :", client_local['heure_depart'], key=f"hd_{id_sel}")
-            
-            frais_transats = calculer_tarif_heures(client_local['heure_arrivee'], h_dep, client_local['transats'])
-            st.markdown(f"💰 **Tarif Transats recalculé : {frais_transats:.2f} €**")
-
-            st.write("---")
-            st.write("💳 **Règlement des Transats :**")
-            if not client_local["transats_payes"]:
-                st.warning(f"Montant Transats dû : {frais_transats:.2f} €")
-                if st.button("💵 Encaisser les transats", key=f"encaisser_transat_{id_sel}"):
-                    client_local["transats_payes"] = True
-                    client_local["paye_direct"] += frais_transats
-                    client_local["montant"] = frais_transats
-                    sauvegarder_reservation(client_local)
-                    st.success("Transats validés comme payés !")
-                    safe_rerun()
-            else:
-                st.success(f"✅ Transats déjà réglés")
-
-            st.write("---")
-            st.write("🛒 **Ajouter une Consommation :**")
-            produit_choisi = st.selectbox("Choisir l'article :", list(TARIFS_CONSO.keys()), key=f"sel_prod_{id_sel}")
-            prix_unitaire = TARIFS_CONSO[produit_choisi]
-            st.info(f"Prix de l'article : {prix_unitaire:.2f} €")
-            
-            col_btn_ard, col_btn_dir = st.columns(2)
-            with col_btn_ard:
-                if st.button("➕ Ajouter à l'Ardoise", key=f"btn_ard_{id_sel}"):
-                    client_local["conso_ardoise"] += prix_unitaire
-                    client_local["historique_conso"].append(f"{produit_choisi} (Ardoise - {prix_unitaire:.2f}€)")
-                    if produit_choisi in st.session_state.stocks: st.session_state.stocks[produit_choisi] = max(0, st.session_state.stocks[produit_choisi] - 1)
-                    sauvegarder_reservation(client_local)
-                    st.success(f"{produit_choisi} ajouté à l'ardoise.")
-                    safe_rerun()
-            with col_btn_dir:
-                if st.button("⚡ Encaisser Direct (Espèce/CB)", key=f"btn_dir_{id_sel}"):
-                    client_local["paye_direct"] += prix_unitaire
-                    client_local["historique_conso"].append(f"{produit_choisi} (Payé Direct - {prix_unitaire:.2f}€)")
-                    if produit_choisi in st.session_state.stocks: st.session_state.stocks[produit_choisi] = max(0, st.session_state.stocks[produit_choisi] - 1)
-                    sauvegarder_reservation(client_local)
-                    st.success(f"{produit_choisi} encaissé en direct.")
-                    safe_rerun()
-
-            if client_local["historique_conso"]:
-                with st.expander("👀 Voir le détail de l'historique sur ce transat"):
-                    for item in client_local["historique_conso"]:
-                        st.text(f"• {item}")
-
-            st.write("---")
-            reste_a_payer_transats = 0.0 if client_local["transats_payes"] else frais_transats
-            total_reste_a_payer = reste_a_payer_transats + client_local["conso_ardoise"]
-            
-            st.markdown(f"<div style='background-color: #10b981; color: white; padding: 10px; border-radius: 8px; text-align: center; font-size: 14px; font-weight: bold; margin-top: 5px;'>DÉJÀ ENCAISSÉ SUR CE TRANSAT : {client_local['paye_direct']:.2f} €</div>", unsafe_allow_html=True)
-            st.markdown(f"<div style='background-color: #1e3a8a; color: white; padding: 12px; border-radius: 8px; text-align: center; font-size: 18px; font-weight: bold; margin-top: 5px; margin-bottom: 10px;'>RESTE À PAYER AU DÉPART : {total_reste_a_payer:.2f} €</div>", unsafe_allow_html=True)
-
             col_f1, col_f2 = st.columns(2)
             with col_f1:
-                if st.button("💵 ENCAISSER LE RESTE & LIBÉRER", key=f"liberer_{id_sel}", type="primary"):
+                st.markdown(f"👤 **Titulaire :** {client_local['client']}")
+                st.markdown(f"📍 **Périmètre d'occupation complet :** {client_local['emplacement']}")
+                st.markdown(f"⏰ **Heure d'arrivée :** {client_local['heure_arrivee']}")
+                
+                h_dep_reelle = st.text_input("⏳ Ajuster / Fixer l'heure de départ réelle :", client_local['heure_depart'], key=f"real_dep_{id_sel}")
+                frais_transats = calculer_tarif_plage(client_local['heure_arrivee'], h_dep_reelle, client_local['transats'])
+                
+                if h_dep_reelle != client_local['heure_depart']:
+                    client_local['heure_depart'] = h_dep_reelle
+                    client_local['montant'] = frais_transats
+                    sauvegarder_reservation(client_local)
+                
+                st.markdown(f"💰 **Tarif Transats Réglementaire : {frais_transats:.2f} €**")
+                
+                if not client_local["transats_payes"]:
+                    st.warning(f"Règlement Transats en attente : {frais_transats:.2f} €")
+                    if st.button("💵 Valider Encaissement Transats", key=f"enc_t_{id_sel}"):
+                        client_local["transats_payes"] = True
+                        client_local["paye_direct"] += frais_transats
+                        sauvegarder_reservation(client_local)
+                        st.rerun()
+                else:
+                    st.success("✅ Location des transats encaissée")
+
+            with col_f2:
+                st.markdown("🛒 **Ajout de Consommation Bar / Snack**")
+                produit = st.selectbox("Sélectionner l'article commandé :", list(TARIFS_CONSO.keys()), key=f"p_{id_sel}")
+                prix_u = TARIFS_CONSO[produit]
+                
+                col_b1, col_b2 = st.columns(2)
+                with col_b1:
+                    if st.button("➕ Mettre sur l'Ardoise", key=f"b_ard_{id_sel}"):
+                        client_local["conso_ardoise"] += prix_u
+                        client_local["historique_conso"].append(f"{produit} (Ardoise — {prix_u:.2f}€)")
+                        if produit in st.session_state.stocks:
+                            st.session_state.stocks[produit] = max(0, st.session_state.stocks[produit] - 1)
+                        sauvegarder_reservation(client_local)
+                        st.rerun()
+                with col_b2:
+                    if st.button("⚡ Encaisser Direct (CB/Espèces)", key=f"b_dir_{id_sel}"):
+                        client_local["paye_direct"] += prix_u
+                        client_local["historique_conso"].append(f"{produit} (Payé Direct — {prix_u:.2f}€)")
+                        if produit in st.session_state.stocks:
+                            st.session_state.stocks[produit] = max(0, st.session_state.stocks[produit] - 1)
+                        sauvegarder_reservation(client_local)
+                        st.rerun()
+
+                if client_local["historique_conso"]:
+                    with st.expander("👀 Voir le récapitulatif détaillé des consos"):
+                        for item in client_local["historique_conso"]:
+                            st.caption(f"• {item}")
+
+            st.write("---")
+            reste_transat = 0.0 if client_local["transats_payes"] else frais_transats
+            total_solde_du = reste_transat + client_local["conso_ardoise"]
+            
+            c_m1, c_m2 = st.columns(2)
+            c_m1.markdown(f"<div style='background-color: #10b981; color: white; padding: 12px; border-radius: 6px; text-align: center; font-weight: bold;'>FLUX ENCAISSÉS SUR CE POSTE : {client_local['paye_direct']:.2f} €</div>", unsafe_allow_html=True)
+            c_m2.markdown(f"<div style='background-color: #1e3a8a; color: white; padding: 12px; border-radius: 6px; text-align: center; font-weight: bold; font-size:16px;'>RESTE À PERCEVOIR DU CLIENT : {total_solde_du:.2f} €</div>", unsafe_allow_html=True)
+
+            st.write("")
+            col_action1, col_action2 = st.columns(2)
+            with col_action1:
+                if st.button("🚨 TOUT ENCAISSER & LIBÉRER LE(S) TRANSAT(S)", key=f"lib_{id_sel}", type="primary"):
                     client_local["emplacement"] = ""
                     client_local["est_place"] = False
                     client_local["statut"] = "Clôturé"
-                    client_local["montant"] = client_local["paye_direct"] + total_reste_a_payer
+                    client_local["montant"] = client_local["paye_direct"] + total_solde_du
                     sauvegarder_reservation(client_local)
-                    st.success(f"Emplacement {id_sel} libéré ! Total final {client_local['montant']:.2f}€ enregistré.")
                     st.session_state.place_selectionnee = None
-                    safe_rerun()
-            with col_f2:
-                if st.button("Fermer la fiche", key=f"fermer_{id_sel}"):
+                    st.success("Emplacement nettoyé et remis en disponibilité.")
+                    st.rerun()
+            with col_action2:
+                if st.button("Fermer la fiche d'activité", key=f"close_{id_sel}"):
                     st.session_state.place_selectionnee = None
-                    safe_rerun()
-# ==============================================================================
-# PAGE 2 : 📝 RÉSERVATIONS DU JOUR
-# ==============================================================================
-elif page == "📝 Réservations du jour":
-    st.markdown(f"### 📝 Registre des Réservations — {date_travail.strftime('%d/%m/%Y')}")
-    
-    # Formulaire d'ajout rapide d'une nouvelle réservation
-    with st.expander("➕ Enregistrer une nouvelle réservation", expanded=False):
-        with st.form("form_nouvelle_resa"):
-            col_f1, col_f2 = st.columns(2)
-            with col_f1:
-                nom_client = st.text_input("Nom du client * :")
-                telephone = st.text_input("Numéro de téléphone :")
-                nb_transats = st.number_input("Nombre de transats :", min_value=1, max_value=20, value=2)
-                preference = st.text_input("Préférence d'emplacement (ex: Ligne A, Ombre) :")
-            with col_f2:
-                heure_arr = st.text_input("Heure d'arrivée (HH:MM) :", value="10:00")
-                heure_dep = st.text_input("Heure de départ (HH:MM) :", value="18:00")
-                notes = st.text_area("Notes particulières :")
-            
-            bouton_valider = st.form_submit_button("Sauvegarder la réservation 💾", type="primary")
-            
-            if bouton_valider:
-                if not nom_client.strip():
-                    st.error("Le nom du client est obligatoire.")
-                else:
-                    nouveau_montant = calculer_tarif_heures(heure_arr, heure_dep, nb_transats)
-                    nouvelle_resa = {
-                        "client": nom_client.strip(),
-                        "telephone": telephone.strip(),
-                        "transats": int(nb_transats),
-                        "preference": preference.strip(),
-                        "emplacement": "",
-                        "est_place": False,
-                        "date_resa": str(date_travail),
-                        "statut": "Confirmé",
-                        "heure_arrivee": heure_arr,
-                        "heure_depart": heure_dep,
-                        "montant": nouveau_montant,
-                        "notes": notes.strip()
-                    }
-                    sauvegarder_reservation(nouvelle_resa)
-                    st.success(f"Réservation enregistrée pour {nom_client} ! (Estimation : {nouveau_montant}€)")
-                    safe_rerun()
+                    st.rerun()
 
-    # Affichage de la liste sous forme de tableau propre
+# ==============================================================================
+# MODULE 2 : 📝 REGISTRE COMPLET DES RÉSERVATIONS
+# ==============================================================================
+elif page == "📝 Registre Réservations":
+    st.markdown("### 📝 Registre Général des Réservations du Jour")
+    
+    with st.form("form_nouvelle_resa"):
+        st.markdown("##### ➕ Insérer une réservation Planifiée")
+        c_r1, c_r2, c_r3 = st.columns([2, 1, 1])
+        nom_c = c_r1.text_input("Nom Client :")
+        tel_c = c_r2.text_input("Téléphone :")
+        nb_tr = c_r3.number_input("Nombre de transats :", min_value=1, max_value=10, value=2)
+        
+        c_r4, c_r5, c_r6 = st.columns(3)
+        h_ar = c_r4.text_input("Heure d'arrivée programmée :", "10:00")
+        h_de = c_r5.text_input("Heure de départ programmée :", "18:00")
+        pref = c_r6.text_input("Préférence de placement (Ex: Ligne 1, Proche Allée) :")
+        
+        if st.form_submit_button("Inscrire au registre officiel", type="primary"):
+            if nom_c.strip():
+                prix_prevu = calculer_tarif_plage(h_ar, h_de, nb_tr)
+                nouvelle_resa = {
+                    "client": nom_c.strip(), "telephone": tel_c.strip(), "transats": int(nb_tr),
+                    "preference": pref.strip(), "emplacement": "", "est_place": False,
+                    "date_resa": str(date_travail), "statut": "Confirmé",
+                    "heure_arrivee": h_ar, "heure_depart": h_de, "montant": prix_prevu,
+                    "transats_payes": False, "conso_ardoise": 0.0, "paye_direct": 0.0, "historique_conso": []
+                }
+                sauvegarder_reservation(nouvelle_resa)
+                st.success(f"Réservation enregistrée pour {nom_c} ({prix_prevu:.2f} € calculés).")
+                st.rerun()
+            else:
+                st.error("Le nom du client est requis.")
+
     st.write("---")
+    st.markdown("##### 📋 Listing opérationnel des mouvements de la journée")
     if not resas_du_jour:
-        st.info("Aucune réservation enregistrée pour cette journée.")
+        st.info("Aucune activité enregistrée pour cette date.")
     else:
         for r in resas_du_jour:
-            statut_badge = "✅ Installé" if r.get("est_place") else "⏳ En attente"
-            place_badge = f"📍 Place : {r['emplacement']}" if r.get("est_place") else "❌ Non placé"
+            statut_visuel = "📍 Placé en " + r['emplacement'] if r.get('est_place') else "⏳ En attente de placement"
+            st.markdown(f"• **{r['client']}** — {r['transats']} Transat(s) — Horaires : {r['heure_arrivee']} à {r['heure_depart']} | **Statut :** `{statut_visuel}`")
+
+# ==============================================================================
+# MODULE 3 : 🛶 FLOTTE DE PÉDALOS (MODULE EXPANSION COMPLET AVEC TIMING)
+# ==============================================================================
+elif page == "🛶 Flotte Pédalos":
+    st.markdown("### 🛶 Base Nautique — Supervision de la Flotte de Pédalos")
+    
+    # Sécurité RAZ journalière de l'état des pédalos
+    for k in st.session_state.pedalos:
+        if st.session_state.pedalos[k].get("compteur_raz") != str(date_travail):
+            st.session_state.pedalos[k] = {"statut": "Disponible", "heure_depart": "", "duree": "1h", "client": "", "compteur_raz": str(date_travail)}
+
+    cols_p = st.columns(5)
+    for i in range(1, 6):
+        pid = str(i)
+        pdata = st.session_state.pedalos[pid]
+        with cols_p[i-1]:
+            if pdata["statut"] == "Disponible":
+                st.markdown(f"<div style='background-color:#d1fae5; padding:10px; border-radius:6px; text-align:center;'><strong>🛶 PÉDALO {pid}</strong><br><span style='color:#065f46;'>Libre</span></div>", unsafe_allow_html=True)
+            else:
+                st.markdown(f"<div style='background-color:#fee2e2; padding:10px; border-radius:6px; text-align:center;'><strong>🛶 PÉDALO {pid}</strong><br><span style='color:#991b1b;'>En mer - {pdata['client'][:10]}</span><br><small>Départ: {pdata['heure_depart']}</small></div>", unsafe_allow_html=True)
             
-            with st.container():
-                col_r1, col_r2, col_r3 = st.columns([4, 3, 2])
-                with col_r1:
-                    st.markdown(f"**👤 {r['client']}** — {r['transats']} transat(s) ({r['heure_arrivee']} - {r['heure_depart']})")
-                    if r.get("notes"): st.caption(f"📝 *Note : {r['notes']}*")
-                with col_r2:
-                    st.write(f"{statut_badge} | {place_badge} | 💰 **{r['montant']} €**")
-                with col_r3:
-                    # Bouton d'annulation/suppression
-                    if st.button("Annuler 🗑️", key=f"del_resa_{r['id']}"):
-                        supprimer_reservation_db(r["id"])
-                        st.success("Réservation supprimée.")
-                        safe_rerun()
-            st.write("<hr style='margin:0.5em 0; border-color:#eee;' />", unsafe_allow_html=True)
+            if st.button(f"Gérer Pédalo {pid}", key=f"g_ped_{pid}"):
+                st.session_state.pedalo_selectionne = pid
+                st.rerun()
 
-# ==============================================================================
-# PAGE 3 : 🛶 PÉDALOS
-# ==============================================================================
-elif page == "🛶 Pédalos":
-    st.markdown("### 🛶 Suivi de la Flotte de Pédalos")
-    st.write("Gestion des départs et des retours à la cabane nautique.")
-
-    for num_p, info_p in st.session_state.pedalos.items():
-        col_p1, col_p2, col_p3 = st.columns([2, 3, 2])
-        with col_p1:
-            st.markdown(f"#### 🛶 Pédalo N°{num_p}")
-            if info_p["statut"] == "Disponible":
-                st.markdown("<span style='color:green; font-weight:bold;'>🟢 Disponible</span>", unsafe_allow_html=True)
-            else:
-                st.markdown(f"<span style='color:red; font-weight:bold;'>🔴 En mer ({info_p['duree']})</span>", unsafe_allow_html=True)
-        
-        with col_p2:
-            if info_p["statut"] == "Disponible":
-                client_p = st.text_input("Client :", key=f"client_p_{num_p}")
-                duree_p = st.selectbox("Durée prévue :", ["30 min", "1h", "2h"], key=f"duree_p_{num_p}")
-            else:
-                st.write(f"👤 Équipage : **{info_p['client']}**")
-                st.write(f"⏰ Parti à : {info_p['heure_depart']}")
-        
-        with col_p3:
-            if info_p["statut"] == "Disponible":
-                if st.button("Louer 🚀", key=f"louer_p_{num_p}", type="primary"):
-                    if client_p.strip():
-                        st.session_state.pedalos[num_p] = {
-                            "statut": "Loué",
-                            "heure_depart": datetime.now().strftime("%H:%M"),
-                            "duree": duree_p,
-                            "client": client_p.strip()
-                        }
-                        st.success(f"Pédalo N°{num_p} a pris la mer !")
-                        safe_rerun()
-                    else:
-                        st.error("Entrez le nom du client.")
-            else:
-                if st.button("Retour Cabane ⚓", key=f"retour_p_{num_p}"):
-                    st.session_state.pedalos[num_p] = {"statut": "Disponible", "heure_depart": "", "duree": "", "client": ""}
-                    st.success(f"Pédalo N°{num_p} nettoyé et de retour !")
-                    safe_rerun()
+    if st.session_state.pedalo_selectionne:
+        pid = st.session_state.pedalo_selectionne
+        pdata = st.session_state.pedalos[pid]
         st.write("---")
-
-# ==============================================================================
-# PAGE 4 : 🍹 STOCKS & CONSO
-# ==============================================================================
-elif page == "🍹 Stocks & Conso":
-    st.markdown("### 🍹 Inventaire du Bar de Plage")
-    st.write("Mise à jour rapide des ventes et réapprovisionnements.")
-    
-    st.write(" ")
-    for produit, quantite in st.session_state.stocks.items():
-        col_item, col_qt, col_actions = st.columns([3, 1, 3])
+        st.markdown(f"#### 🛰️ Contrôle d'Activité Maritime — Pédalo **N° {pid}**")
         
-        with col_item:
-            st.markdown(f"##### 🍹 {produit}")
-        with col_qt:
-            # Alerte si le stock devient trop bas
-            if quantite <= 10:
-                st.markdown(f"<span style='color:red; font-weight:bold;'>{quantite} (BAS)</span>", unsafe_allow_html=True)
+        if pdata["statut"] == "Disponible":
+            with st.form(f"f_lancement_pedalo_{pid}"):
+                nom_p = st.text_input("Nom du Client / N° Transat :")
+                dur = st.selectbox("Durée programmée :", ["1 heure (20€)", "2 heures (35€)", "Demi-heure (15€)"])
+                h_dep_p = st.text_input("Heure de mise à l'eau :", datetime.now().strftime("%H:%M"))
+                if st.form_submit_button("Lancer l'expédition 🌊", type="primary"):
+                    if nom_p.strip():
+                        st.session_state.pedalos[pid] = {
+                            "statut": "En mer", "heure_depart": h_dep_p, "duree": dur,
+                            "client": nom_p.strip(), "compteur_raz": str(date_travail)
+                        }
+                        st.success(f"Pédalo {pid} marqué en mer.")
+                        st.rerun()
+                    else:
+                        st.error("Nom du client obligatoire pour le registre de sécurité maritime.")
+        else:
+            st.info(f"📍 **Client à bord :** {pdata['client']} | **Durée :** {pdata['duree']} | **Départ :** {pdata['heure_depart']}")
+            px_p = 20.0 if "1 heure" in pdata["duree"] else (35.0 if "2 heures" in pdata["duree"] else 15.0)
+            st.markdown(f"💰 **Tarif à percevoir : {px_p:.2f} €**")
+            
+            if st.button("🏁 Encaisser Retour de Mer & Libérer le matériel", type="primary", key=f"lib_ped_{pid}"):
+                st.session_state.pedalos[pid] = {"statut": "Disponible", "heure_depart": "", "duree": "1h", "client": "", "compteur_raz": str(date_travail)}
+                st.success(f"Le Pédalo N° {pid} est de retour à la base et disponible.")
+                st.session_state.pedalo_selectionne = None
+                st.rerun()
+
+# ==============================================================================
+# MODULE 4 : 🍹 SUIVI DES STOCKS & CAISSE BUVETTE
+# ==============================================================================
+elif page == "🍹 Suivi Stocks":
+    st.markdown("### 🍹 Inventaire Tournant et Réappro Buvette")
+    
+    st.info("Les ventes depuis le plan de plage déduisent automatiquement les quantités de cette liste.")
+    
+    col_st1, col_st2 = st.columns(2)
+    
+    with col_st1:
+        st.markdown("##### 📦 Quantités Restantes au Comptoir")
+        for prod, qty in st.session_state.stocks.items():
+            c_p1, c_p2, c_p3 = st.columns([3, 1, 2])
+            c_p1.write(f"**{prod}** ({TARIFS_CONSO[prod]:.2f} €)")
+            
+            # Alerte visuelle stock bas
+            if qty <= 5:
+                c_p2.markdown(f"<span style='color:red; font-weight:bold;'>{qty}</span>", unsafe_allow_html=True)
             else:
-                st.markdown(f"**{quantite}**")
-        with col_actions:
-            c_m1, c_p1, c_p10 = st.columns(3)
-            with c_m1:
-                if st.button("➖ 1", key=f"m1_{produit}"):
-                    if st.session_state.stocks[produit] > 0:
-                        st.session_state.stocks[produit] -= 1
-                        safe_rerun()
-            with c_p1:
-                if st.button("➕ 1", key=f"p1_{produit}"):
-                    st.session_state.stocks[produit] += 1
-                    safe_rerun()
-            with c_p10:
-                if st.button("➕ 10", key=f"p10_{produit}"):
-                    st.session_state.stocks[produit] += 10
-                    safe_rerun()
-        st.write("<hr style='margin:0.3em 0; border-color:#eee;' />", unsafe_allow_html=True)
+                c_p2.write(f"{qty}")
+                
+            if c_p3.button("➕ 1 Réappro", key=f"add_st_{prod}"):
+                st.session_state.stocks[prod] += 1
+                st.rerun()
 
-# ==============================================================================
-# PAGE 5 : 📊 FIN DE JOURNÉE
-# ==============================================================================
-elif page == "📊 Fin de journée":
-    st.markdown(f"### 📊 Bilan du Jour — {date_travail.strftime('%d/%m/%Y')}")
-    
-    # Calcul des indicateurs clés financiers
-    total_ca_estime = sum(float(r.get("montant", 0.0)) for r in resas_du_jour)
-    total_transats_loues = sum(int(r.get("transats", 0)) for r in resas_du_jour if r.get("est_place"))
-    total_clients = len(resas_du_jour)
-
-    col_m1, col_m2, col_m3 = st.columns(3)
-    with col_m1:
-        st.metric("💰 Chiffre d'Affaires Plage Estimé", f"{total_ca_estime:.2f} €")
-    with col_m2:
-        st.metric("🪑 Total Transats Occupés", f"{total_transats_loues} / 50")
-    with col_m3:
-        st.metric("👥 Dossiers Clients Traités", total_clients)
-
-    st.write("---")
-    st.markdown("#### ✅ Récapitulatif des emplacements clôturés")
-    
-    if not resas_du_jour:
-        st.info("Aucune activité aujourd'hui pour générer le récapitulatif.")
-    else:
-        tableau_recap = []
-        for r in resas_du_jour:
-            tableau_recap.append({
-                "Client": r["client"],
-                "Transats": r["transats"],
-                "Emplacement": r["emplacement"] if r.get("est_place") else "Non placé",
-                "Horaires": f"{r['heure_arrivee']} - {r['heure_depart']}",
-                "Montant dû": f"{r['montant']} €"
-            })
-        st.table(tableau_recap)
+    with col_st2:
+        st.markdown("##### 🔧 Ajustement Manuel de l'Inventaire")
+        prod_select = st.selectbox("Sélectionner l'article à réajuster :", list(st.session_state.stocks.keys()))
+        nouvelle_qte = st.number_input("Définir la nouvelle quantité exacte en stock :", min_value=0, max_value=500, value=int(st.session_state.stocks[prod_select]))
+        if st.button("Mettre à jour le stock physique", type="primary"):
+            st.session_state.stocks[prod_select] = nouvelle_qte
+            st.success(f"Stock de {prod_select} recalibré à {nouvelle_qte} unités.")
+            st.rerun()
