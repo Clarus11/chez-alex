@@ -127,7 +127,7 @@ if not st.session_state.autorise:
                 st.error("Mot de passe incorrect ❌")
     
     # --- C'EST LÀ LA CLÉ ! ---
-    st.stop() # <--- Tout ce qui est en dessous ne sera JAMAIS lu si on n'est pas autorisé
+st.stop() # <--- Tout ce qui est en dessous ne sera JAMAIS lu si on n'est pas autorisé
 
 # SI ON ARRIVE ICI, C'EST QUE LE MDP EST BON
 # Tu n'as PAS besoin d'indenter tout ton code.
