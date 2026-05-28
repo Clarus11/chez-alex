@@ -83,8 +83,8 @@ st.markdown("""
 # ==========================================
 def calculer_tarif_heures(heure_arr, heure_dep, nb_transats):
     try:
-        t1 = datetime.strptime(heure_arr, "%H:%M")
-        t2 = datetime.strptime(heure_dep, "%H:%M")
+        t1 = datetime.datetime.strptime(heure_arr, "%H:%M")
+        t2 = datetime.datetime.strptime(heure_dep, "%H:%M")
         diff = t2 - t1
         minutes = diff.total_seconds() / 60
         if minutes < 0:
@@ -127,7 +127,7 @@ if not st.session_state.autorise:
                 st.error("Mot de passe incorrect ❌")
     
     # --- C'EST LÀ LA CLÉ ! ---
-st.stop() # <--- Tout ce qui est en dessous ne sera JAMAIS lu si on n'est pas autorisé
+    st.stop() # <--- Tout ce qui est en dessous ne sera JAMAIS lu si on n'est pas autorisé
 
 st.write("--- DEBUG : Le code est bien arrivé ici ! ---")
 # SI ON ARRIVE ICI, C'EST QUE LE MDP EST BON
