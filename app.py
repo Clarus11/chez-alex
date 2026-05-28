@@ -113,6 +113,7 @@ if "autorise" not in st.session_state:
 
 mdp_secret = st.secrets.get("password", "alex2026")
 
+# SI NON AUTORISÉ, ON AFFICHE LE LOGIN ET ON STOPPE L'APP
 if not st.session_state.autorise:
     st.markdown("<h2 style='text-align: center; color: #854d0e;'>🏖️ Chez Alex - Équipe</h2>", unsafe_allow_html=True)
     col1, col2, col3 = st.columns([1, 2, 1])
@@ -124,9 +125,13 @@ if not st.session_state.autorise:
                 st.rerun()
             else:
                 st.error("Mot de passe incorrect ❌")
-else:
-        st.write("--- JE SUIS DANS LE ELSE ---") # <--- AJOUTE ÇA
-        pass  # Indique à Python que le else est géré
+    
+    # --- C'EST LÀ LA CLÉ ! ---
+    st.stop() # <--- Tout ce qui est en dessous ne sera JAMAIS lu si on n'est pas autorisé
+
+# SI ON ARRIVE ICI, C'EST QUE LE MDP EST BON
+# Tu n'as PAS besoin d'indenter tout ton code.
+# Tout ton code peut rester exactement là où il est, à la colonne 0 !
 
 # COLLÉ TOUT À GAUCHE (Aucun espace avant def)
 def charger_donnees_depuis_supabase():
