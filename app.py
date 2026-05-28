@@ -1,6 +1,6 @@
 import streamlit as st
 from supabase import create_client, Client
-import datetime
+from datetime import datetime, date
 
 # 1. Connexion sécurisée à ta base Supabase via les Secrets Streamlit
 url = st.secrets["SUPABASE_URL"]
@@ -8,7 +8,7 @@ key = st.secrets["SUPABASE_KEY"]
 supabase = create_client(url, key)
 
 # 2. On récupère la date du jour pour filtrer automatiquement
-aujourd_hui = str(datetime.date.today())
+aujourd_hui = str(date.today())
 
 # ==========================================
 # 1. CONFIGURATION ET STYLE
@@ -168,6 +168,13 @@ def charger_donnees_depuis_supabase():
                     "transats_payes": False, "prix_transats_encaisse": 0.0, "conso_ardoise": 0.0, 
                     "historique_conso": [], "paye_direct": 0.0, "historique_paye_direct": []
                 }
+
+    # === ICI ON CHARGE LES SAUVEGARDES DU CLOUD ===
+# Si c'est le tout premier chargement de la page, on applique les données de Supabase
+if "donnees_chargees" not in st.session_state:
+    charger_donnees_depuis_supabase()
+    st.session_state.donnees_chargees = True
+# ==============================================
     
     # Flotte de Pédalos vide
     if "pedalos" not in st.session_state:
@@ -177,11 +184,6 @@ def charger_donnees_depuis_supabase():
                 "statut": "Disponible", "client": "", "heure_depart": "", "duree_prevue": "1h", "total_du": 0.0
             }
 
-    # === ICI ON CHARGE LES SAUVEGARDES DU CLOUD ===
-    # Si c'est le tout premier chargement de la page, on applique les données de Supabase
-    if "donnees_chargees" not in st.session_state:
-        charger_donnees_depuis_supabase()
-        st.session_state.donnees_chargees = True
     # ==============================================
 
     # Liste officielle des produits et prix
