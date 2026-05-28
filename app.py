@@ -365,7 +365,7 @@ if "donnees_chargees" not in st.session_state:
                                     "statut_paiement": "Payé"
                                 }).eq("date", aujourd_hui).eq("numero_transat", id_sel).execute()
                             except Exception as e:
-                                pass
+                                st.error(f"Erreur : {e}")
 
                             st.rerun()
                     else:
@@ -395,7 +395,7 @@ if "donnees_chargees" not in st.session_state:
                                 }
                                 supabase.table("consommations").insert(nouvelle_conso).execute()
                             except Exception as e:
-                                pass
+                                st.error(f"Erreur : {e}")
 
                             st.rerun()
 
@@ -415,7 +415,7 @@ if "donnees_chargees" not in st.session_state:
                                 }
                                 supabase.table("consommations").insert(nouvelle_conso).execute()
                             except Exception as e:
-                                pass
+                                st.error(f"Erreur : {e}")
 
                             st.rerun()
 
@@ -446,7 +446,7 @@ if "donnees_chargees" not in st.session_state:
                                 "statut_paiement": "Libre"
                             }).eq("date", aujourd_hui).eq("numero_transat", id_sel).execute()
                         except Exception as e:
-                            pass
+                            st.error(f"Erreur : {e}")
                         
                         st.session_state.plage[id_sel] = {
                             "statut": "Libre", "client": "", "heure_arrivee": "", "nb_transats": 2, 
@@ -588,9 +588,6 @@ if "donnees_chargees" not in st.session_state:
         st.markdown("<h3 style='color: #854d0e;'>📊 Caisse du Jour</h3>", unsafe_allow_html=True)
         st.metric("Total Encaissé Aujourd'hui", f"{st.session_state.ca_jour:.2f} €")
 
-    # ==========================================
-    # MODULE : RÉSERVATIONS
-    # ==========================================
   # ==========================================
     # MODULE : RÉSERVATIONS (MODE DÉPLACEMENT DIRECT)
     # ==========================================
