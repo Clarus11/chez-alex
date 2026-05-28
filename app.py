@@ -7,17 +7,12 @@ from datetime import datetime, date
 import traceback
 
 # 1. FALLBACK RERUN (Pour éviter les crashs de rafraîchissement)
+# 1. FALLBACK RERUN (Correction définitive du redémarrage)
 def safe_rerun():
-    try:
-        if hasattr(st, "experimental_rerun") and callable(st.experimental_rerun):
-            return st.experimental_rerun()
-    except Exception:
-        pass
-    try:
-        if hasattr(st, "rerun") and callable(st.rerun):
-            return st.rerun()
-    except Exception:
-        pass
+    if hasattr(st, "rerun"):
+        st.rerun()
+    else:
+        st.experimental_rerun()
     st.session_state["_force_rerun_flag"] = not st.session_state.get("_force_rerun_flag", False)
 
 # 2. GESTION DES ERREURS
