@@ -1,6 +1,14 @@
 import streamlit as st
-from streamlit_gsheets import GSheetsConnection
-from datetime import datetime
+from supabase import create_client, Client
+import datetime
+
+# 1. Connexion sécurisée à ta base Supabase via les Secrets Streamlit
+url: str = st.secrets["https://xqcvqdoksggoawncvefl.supabase.co"]
+key: str = st.secrets["sb_publishable_2MMX6jS6pouTlHd3ARtotA_-imy1Qam"]
+supabase: Client = create_client(url, key)
+
+# 2. On récupère la date du jour pour filtrer automatiquement
+aujourd_hui = str(datetime.date.today())
 
 # ==========================================
 # 1. CONFIGURATION ET STYLE
@@ -71,22 +79,6 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 # ==========================================
-# # 2. CONNEXION GOOGLE SHEETS
-# ==========================================
-#ID_CIBLE = "1hp2tK4WcDJcWv9ww1ZIuod-nwz8ywaGiNBiSPlYylzE"
-
-#conn.read = st.connection("gsheets", type=GSheetsConnection)
-
-# On tente de lire avec l'ID
-#data_plage = conn.read(spreadsheet=ID_CIBLE, worksheet="plage")
-
-#st.write(data_plage)
-
-# 3. Affichage direct des données
-#st.success("✅ Données chargées !")
-#st.dataframe(data_plage)
-
-# ==========================================
 # 3. CALCUL DYNAMIQUE DES TARIFS PAR HEURES
 # ==========================================
 def calculer_tarif_heures(heure_arr, heure_dep, nb_transats):
@@ -133,9 +125,35 @@ if not st.session_state.autorise:
             else:
                 st.error("Mot de passe incorrect ❌")
 else:
+
+def charger_donnees_depuis_supabase():
+    # 1. Charger les transats
+    try:
+        rep_transats = supabase.table("transats").select("*").eq("date", aujourd_hui).execute()
+        for ligne in rep_transats.data:
+            id_c = ligne["numero_transat"] # ex: "L1-G2"
+            if id_c in st.session_state.plage:
+                st.session_state.plage[id_c]["statut"] = ligne["statut_paiement"] # Ou 'Occupé' selon ta logique
+                st.session_state.plage[id_c]["client"] = ligne["nom_client"]
+                st.session_state.plage[id_c]["prix_transats_encaisse"] = float(ligne["prix"])
+    except Exception as e:
+        st.error(f"Erreur chargement transats: {e}")
+
+    # 2. Charger les pédalos
+    try:
+        rep_pedalos = supabase.table("pedalos").select("*").eq("date", aujourd_hui).execute()
+        for ligne in rep_pedalos.data:
+            nom_p = f"Pédalo {ligne['id']}" # Ou selon comment tu gères l'ID
+            if nom_p in st.session_state.pedalos:
+                st.session_state.pedalos[nom_p]["statut"] = ligne["statut"]
+                st.session_state.pedalos[nom_p]["client"] = "Client Cloud" # À adapter si tu as le nom
+    except Exception as e:
+        st.error(f"Erreur chargement pédalos: {e}")
+
     # ==========================================
-    # 5. INITIALISATION DES STRUCTURES DE DONNÉES
+   # 5. INITIALISATION DES STRUCTURES DE DONNÉES
     # ==========================================
+    # On force la création des structures vides si elles n'existent pas du tout
     if "plage" not in st.session_state:
         st.session_state.plage = {}
 
@@ -149,13 +167,20 @@ else:
                     "historique_conso": [], "paye_direct": 0.0, "historique_paye_direct": []
                 }
     
-    # Flotte de Pédalos
+    # Flotte de Pédalos vide
     if "pedalos" not in st.session_state:
         st.session_state.pedalos = {}
         for p in range(1, 6):
             st.session_state.pedalos[f"Pédalo {p}"] = {
                 "statut": "Disponible", "client": "", "heure_depart": "", "duree_prevue": "1h", "total_du": 0.0
             }
+
+    # === ICI ON CHARGE LES SAUVEGARDES DU CLOUD ===
+    # Si c'est le tout premier chargement de la page, on applique les données de Supabase
+    if "donnees_chargees" not in st.session_state:
+        charger_donnees_depuis_supabase()
+        st.session_state.donnees_chargees = True
+    # ==============================================
 
     # Liste officielle des produits et prix
     TARIFS_CONSO = {
@@ -259,7 +284,7 @@ else:
                     st.session_state.groupe_selectionne = id_c
                     st.rerun()
 
-        if st.session_state.groupe_selectionne:
+if st.session_state.groupe_selectionne:
             @st.dialog("Gestion de l'emplacement")
             def gerer_place(id_sel):
                 # Réparation invisible des vieux caches pour éviter l'erreur KeyError
@@ -288,6 +313,24 @@ else:
                                 "transats_payes": False, "prix_transats_encaisse": 0.0, "conso_ardoise": 0.0,
                                 "historique_conso": [], "paye_direct": 0.0, "historique_paye_direct": []
                             })
+                            
+                            # =====================================================================
+                            # 💾 SUPABASE SAUVEGARDE : Enregistrement de l'installation du client
+                            # =====================================================================
+                            try:
+                                nouvelle_resa = {
+                                    "date": aujourd_hui,
+                                    "numero_transat": id_sel,  # Garde le format "L1-G2"
+                                    "nom_client": nom,
+                                    "periode": "Journée",  # Période par défaut calculée dynamiquement au départ
+                                    "prix": 0.0,           # Sera mis à jour ou validé à l'encaissement
+                                    "statut_paiement": "Occupé"
+                                }
+                                supabase.table("transats").insert(nouvelle_resa).execute()
+                            except Exception as e:
+                                st.error(f"Erreur sauvegarde cloud : {e}")
+                            # =====================================================================
+
                             st.session_state.groupe_selectionne = None
                             st.rerun()
                         else:
@@ -309,39 +352,68 @@ else:
                             st.session_state.ca_jour += frais_transats
                             st.session_state.plage[id_sel]["transats_payes"] = True
                             st.session_state.plage[id_sel]["prix_transats_encaisse"] = frais_transats
+                            
+                            # 💾 SUPABASE SAUVEGARDE : Met à jour le prix et signale que c'est payé
+                            try:
+                                supabase.table("transats").update({
+                                    "prix": frais_transats, 
+                                    "statut_paiement": "Payé"
+                                }).eq("date", aujourd_hui).eq("numero_transat", id_sel).execute()
+                            except Exception as e:
+                                pass
+
                             st.rerun()
                     else:
                         st.success(f"✅ Transats réglés en direct ({info.get('prix_transats_encaisse', 0.0):.2f} €)")
 
                     st.write("---")
                     st.write("🛒 **Ajouter une Consommation :**")
-                    # Sélection du produit
                     produit_choisi = st.selectbox("Choisir l'article :", list(TARIFS_CONSO.keys()))
                     prix_unitaire = TARIFS_CONSO[produit_choisi]
                     st.info(f"Prix unitaire : {prix_unitaire:.2f} €")
 
-                    # 🔴 LA LIGNE DE SOUSTRACTION AUTOMATIQUE QUI ÉTAIT ICI A ÉTÉ SUPPRIMÉE 🔴
-
                     col_btn_ard, col_btn_dir = st.columns(2)
 
                     with col_btn_ard:
-                        # Ajout d'une key unique pour stabiliser le bouton
                         if st.button("➕ Ajouter à l'Ardoise", key=f"btn_ard_{id_sel}", use_container_width=True):
                             st.session_state.plage[id_sel]["conso_ardoise"] += prix_unitaire
                             st.session_state.plage[id_sel]["historique_conso"].append(f"{produit_choisi} (Ardoise)")
-                            st.session_state.stocks[produit_choisi] -= 1  # 🟢 La déduction se fait UNIQUEMENT ici
+                            st.session_state.stocks[produit_choisi] -= 1
+                            
+                            # 💾 SUPABASE SAUVEGARDE : Enregistrement de la consommation en base
+                            try:
+                                nouvelle_conso = {
+                                    "article": produit_choisi,
+                                    "quantite": 1,
+                                    "prix_total": prix_unitaire,
+                                    "numero_transat_associe": int(id_sel.replace("L","").replace("-G","")) # Convertit L1-G2 en nombre 12 pour suivi optionnel
+                                }
+                                supabase.table("consommations").insert(nouvelle_conso).execute()
+                            except Exception as e:
+                                pass
+
                             st.rerun()
 
                     with col_btn_dir:
-                        # Ajout d'une key unique pour stabiliser le bouton      
                         if st.button("⚡ Encaisser Direct", key=f"btn_dir_{id_sel}", use_container_width=True, type="primary"):
                             st.session_state.ca_jour += prix_unitaire
                             st.session_state.plage[id_sel]["paye_direct"] += prix_unitaire
                             st.session_state.plage[id_sel]["historique_paye_direct"].append(f"{produit_choisi} (Direct)")
-                            st.session_state.stocks[produit_choisi] -= 1  # 🟢 Et UNIQUEMENT ici
+                            st.session_state.stocks[produit_choisi] -= 1
+                            
+                            # 💾 SUPABASE SAUVEGARDE : Enregistrement de la vente comptoir directe
+                            try:
+                                nouvelle_conso = {
+                                    "article": produit_choisi,
+                                    "quantite": 1,
+                                    "prix_total": prix_unitaire
+                                }
+                                supabase.table("consommations").insert(nouvelle_conso).execute()
+                            except Exception as e:
+                                pass
+
                             st.rerun()
 
-                    # Résumé des consos sur la fiche
                     if info.get("historique_conso") or info.get("historique_paye_direct"):
                         with st.expander("👀 Voir le détail des consos"):
                             if info.get("historique_conso"):
@@ -361,6 +433,16 @@ else:
                     col_f1, col_f2 = st.columns(2)
                     if col_f1.button("💵 ENCAISSER RESTE & LIBÉRER", type="primary"):
                         st.session_state.ca_jour += total_du_final
+                        
+                        # 💾 SUPABASE SAUVEGARDE : Clôture définitive de la ligne transat dans le cloud avant libération
+                        try:
+                            supabase.table("transats").update({
+                                "prix": info.get('prix_transats_encaisse', 0.0) + transats_dus,
+                                "statut_paiement": "Libre"
+                            }).eq("date", aujourd_hui).eq("numero_transat", id_sel).execute()
+                        except Exception as e:
+                            pass
+                        
                         st.session_state.plage[id_sel] = {
                             "statut": "Libre", "client": "", "heure_arrivee": "", "nb_transats": 2, 
                             "transats_payes": False, "prix_transats_encaisse": 0.0, "conso_ardoise": 0.0, 
@@ -368,11 +450,12 @@ else:
                         }
                         st.session_state.groupe_selectionne = None
                         st.rerun()
+                        
                     if col_f2.button("Fermer"):
                         st.session_state.groupe_selectionne = None
                         st.rerun()
 
-            gerer_place(st.session_state.groupe_selectionne)
+            gerer_place(st.session_state.groupe_selectionne)       
     # ==========================================
     # MODULE : PÉDALOS (20€/h)
     # ==========================================
