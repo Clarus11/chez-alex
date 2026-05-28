@@ -363,7 +363,56 @@ if page == "🏖️ Plan de la plage":
                 st.success(f"✅ Transats déjà réglés")
 
             st.write("---")
-            st.write("🛒 **Ajouter une Consommation :**
+            st.write("🛒 **Ajouter une Consommation :**")
+            produit_choisi = st.selectbox("Choisir l'article :", list(TARIFS_CONSO.keys()), key=f"sel_prod_{id_sel}")
+            prix_unitaire = TARIFS_CONSO[produit_choisi]
+            st.info(f"Prix de l'article : {prix_unitaire:.2f} €")
+            
+            col_btn_ard, col_btn_dir = st.columns(2)
+            with col_btn_ard:
+                if st.button("➕ Ajouter à l'Ardoise", key=f"btn_ard_{id_sel}"):
+                    client_local["conso_ardoise"] += prix_unitaire
+                    client_local["historique_conso"].append(f"{produit_choisi} (Ardoise - {prix_unitaire:.2f}€)")
+                    if produit_choisi in st.session_state.stocks: st.session_state.stocks[produit_choisi] = max(0, st.session_state.stocks[produit_choisi] - 1)
+                    sauvegarder_reservation(client_local)
+                    st.success(f"{produit_choisi} ajouté à l'ardoise.")
+                    safe_rerun()
+            with col_btn_dir:
+                if st.button("⚡ Encaisser Direct (Espèce/CB)", key=f"btn_dir_{id_sel}"):
+                    client_local["paye_direct"] += prix_unitaire
+                    client_local["historique_conso"].append(f"{produit_choisi} (Payé Direct - {prix_unitaire:.2f}€)")
+                    if produit_choisi in st.session_state.stocks: st.session_state.stocks[produit_choisi] = max(0, st.session_state.stocks[produit_choisi] - 1)
+                    sauvegarder_reservation(client_local)
+                    st.success(f"{produit_choisi} encaissé en direct.")
+                    safe_rerun()
+
+            if client_local["historique_conso"]:
+                with st.expander("👀 Voir le détail de l'historique sur ce transat"):
+                    for item in client_local["historique_conso"]:
+                        st.text(f"• {item}")
+
+            st.write("---")
+            reste_a_payer_transats = 0.0 if client_local["transats_payes"] else frais_transats
+            total_reste_a_payer = reste_a_payer_transats + client_local["conso_ardoise"]
+            
+            st.markdown(f"<div style='background-color: #10b981; color: white; padding: 10px; border-radius: 8px; text-align: center; font-size: 14px; font-weight: bold; margin-top: 5px;'>DÉJÀ ENCAISSÉ SUR CE TRANSAT : {client_local['paye_direct']:.2f} €</div>", unsafe_allow_html=True)
+            st.markdown(f"<div style='background-color: #1e3a8a; color: white; padding: 12px; border-radius: 8px; text-align: center; font-size: 18px; font-weight: bold; margin-top: 5px; margin-bottom: 10px;'>RESTE À PAYER AU DÉPART : {total_reste_a_payer:.2f} €</div>", unsafe_allow_html=True)
+
+            col_f1, col_f2 = st.columns(2)
+            with col_f1:
+                if st.button("💵 ENCAISSER LE RESTE & LIBÉRER", key=f"liberer_{id_sel}", type="primary"):
+                    client_local["emplacement"] = ""
+                    client_local["est_place"] = False
+                    client_local["statut"] = "Clôturé"
+                    client_local["montant"] = client_local["paye_direct"] + total_reste_a_payer
+                    sauvegarder_reservation(client_local)
+                    st.success(f"Emplacement {id_sel} libéré ! Total final {client_local['montant']:.2f}€ enregistré.")
+                    st.session_state.place_selectionnee = None
+                    safe_rerun()
+            with col_f2:
+                if st.button("Fermer la fiche", key=f"fermer_{id_sel}"):
+                    st.session_state.place_selectionnee = None
+                    safe_rerun()
 # ==============================================================================
 # PAGE 2 : 📝 RÉSERVATIONS DU JOUR
 # ==============================================================================
