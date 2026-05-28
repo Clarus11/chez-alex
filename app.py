@@ -195,22 +195,24 @@ with st.sidebar:
 resas_du_jour = charger_reservations(date_travail)
 
 # ==============================================================================
-# PAGE 1 : 🏖️ PLAN DE LA PLAGE
+# PAGE 1 : 🏖️ PLAN DE LA PLAGE (Mis à jour : Format 1-1 & Système complet)
 # ==============================================================================
 if page == "🏖️ Plan de la plage":
-    st.markdown(f"### 🏖️ Plan Interactif de la Plage — {date_travail.strftime('%d/%m/%Y')}")
-    st.write("Visualisation des transats et attribution en direct.")
+    st.markdown(f"<h3 style='color: #854d0e; text-align: center;'>PLAN DU JOUR — {date_travail.strftime('%d/%m/%Y')}</h3>", unsafe_allow_html=True)
+
+    # Initialisation de la variable de sélection dans le session_state si elle n'existe pas
+    if "place_selectionnee" not in st.session_state:
+        st.session_state.place_selectionnee = None
 
     # Cartographie de l'occupation actuelle des transats
     occupation_transats = {}
     for r in resas_du_jour:
         if r.get("est_place") and r.get("emplacement"):
-            # Un client peut réserver plusieurs places séparées par des virgules (ex: A1,A2)
             places = [p.strip() for p in str(r["emplacement"]).split(",") if p.strip()]
             for p in places:
                 occupation_transats[p] = r
 
-    # Liste d'attente pour le placement
+    # Liste d'attente pour le placement rapide
     clients_en_attente = [r for r in resas_du_jour if not r.get("est_place")]
 
     if clients_en_attente:
@@ -220,7 +222,7 @@ if page == "🏖️ Plan de la plage":
                 with col_c1:
                     st.write(f"👤 **{r['client']}** ({r['transats']} transat(s) — Préf: {r.get('preference', 'Aucune')})")
                 with col_c2:
-                    emplacement_choisi = st.text_input("Attribuer place(s) (ex: A1, A2) :", key=f"place_input_{r['id']}")
+                    emplacement_choisi = st.text_input("Attribuer place(s) (ex: 1-1, 1-2) :", key=f"place_input_{r['id']}")
                 with col_c3:
                     if st.button("Installer ✅", key=f"install_btn_{r['id']}", type="primary"):
                         if emplacement_choisi.strip():
@@ -234,24 +236,183 @@ if page == "🏖️ Plan de la plage":
 
     st.write("---")
     
-    # Génération graphique de la grille des transats (Lignes A à E, 10 transats par ligne)
-    lignes = ["A", "B", "C", "D", "E"]
-    for l in lignes:
-        st.markdown(f"**Ligne {l}**")
-        colonnes_grille = st.columns(10)
-        for num in range(1, 11):
-            nom_place = f"{l}{num}"
-            with colonnes_grille[num - 1]:
+    # Génération de la grille au format 1-1 jusqu'à 7-10 (7 lignes, 10 transats par ligne)
+    # Avec l'allée centrale après le transat 5
+    for l in range(1, 8):
+        st.caption(f"Ligne {l}")
+        cols_grille = st.columns([1, 1, 1, 1, 1, 0.4, 1, 1, 1, 1, 1])
+        
+        # Transats 1 à 5 (Gauche de l'allée)
+        for g in range(1, 6):
+            nom_place = f"{l}-{g}"
+            with cols_grille[g - 1]:
                 if nom_place in occupation_transats:
-                    client_sur_transat = occupation_transats[nom_place]
-                    # Transat occupé (Bouton Rouge)
-                    if st.button(f"🔴\n{nom_place}", key=f"btn_grid_{nom_place}"):
-                        st.info(f"**Emplacement {nom_place}**\n\n👤 Client : {client_sur_transat['client']}\n\n📞 Tél : {client_sur_transat['telephone']}\n\n⏰ Horaires : {client_sur_transat['heure_arrivee']} - {client_sur_transat['heure_depart']}")
+                    label = f"🔴\n{occupation_transats[nom_place]['client']}"
                 else:
-                    # Transat libre (Bouton Blanc/Neutre)
-                    if st.button(f"⚪\n{nom_place}", key=f"btn_grid_{nom_place}"):
-                        st.success(f"L'emplacement {nom_place} est actuellement libre.")
+                    label = f"🟢\n{l}-{g}"
+                if st.button(label, key=f"btn_grid_{nom_place}"):
+                    st.session_state.place_selectionnee = nom_place
+                    safe_rerun()
+                    
+        # Allée centrale
+        with cols_grille[5]:
+            st.markdown("<div style='background-color: #fef08a; color: #854d0e; font-weight: bold; text-align: center; padding: 10px 1px; border-radius: 4px; font-size: 9px; writing-mode: vertical-lr; height: 55px; display: flex; align-items: center; justify-content: center;'>ALLÉE</div>", unsafe_allow_html=True)
+            
+        # Transats 6 à 10 (Droite de l'allée)
+        for g in range(6, 11):
+            nom_place = f"{l}-{g}"
+            with cols_grille[g]:
+                if nom_place in occupation_transats:
+                    label = f"🔴\n{occupation_transats[nom_place]['client']}"
+                else:
+                    label = f"🟢\n{l}-{g}"
+                if st.button(label, key=f"btn_grid_{nom_place}"):
+                    st.session_state.place_selectionnee = nom_place
+                    safe_rerun()
 
+    # ==============================================================================
+    # LE SYSTÈME DE GESTION COMPLET AU CLIC (S'affiche sous la grille)
+    # ==============================================================================
+    if st.session_state.place_selectionnee:
+        id_sel = st.session_state.place_selectionnee
+        st.write("---")
+        st.markdown(f"### 🗂️ Gestion de l'Emplacement **{id_sel}**")
+        
+        # Tarifs Consos pour le selectbox
+        TARIFS_CONSO = {
+            "Coca-Cola": 2.50, "Coca-Cola Zero": 2.50, "Orangina": 2.50, "Schweppes Agrume": 2.50,
+            "Petite Eau": 1.50, "Grande Eau": 2.50, "Café / Thé": 1.00, "Virgin Mojito": 6.00, "Glace Artisanale": 3.80
+        }
+
+        # CAS 1 : L'emplacement sélectionné est LIBRE
+        if id_sel not in occupation_transats:
+            st.info(f"L'emplacement {id_sel} est libre. Vous pouvez y installer un client direct sans réservation préalable.")
+            
+            with st.form(f"form_installation_directe_{id_sel}"):
+                nom = st.text_input("👤 Nom du client :")
+                nb_t = st.number_input("🪑 Nombre de transats :", min_value=1, max_value=4, value=2)
+                h_a = st.text_input("⏰ Heure d'arrivée :", datetime.now().strftime("%H:%M"))
+                h_d = st.text_input("⏳ Heure de départ prévue :", "18:00")
+                notes_inst = st.text_area("Notes / Demandes spécifiques :")
+                
+                if st.form_submit_button("✅ Installer le client en direct", type="primary"):
+                    if not nom.strip():
+                        st.error("Le nom du client est obligatoire.")
+                    else:
+                        frais_estimés = calculer_tarif_heures(h_a, h_d, nb_t)
+                        nouvelle_resa_directe = {
+                            "client": nom.strip(),
+                            "telephone": "Client Direct",
+                            "transats": int(nb_t),
+                            "preference": "",
+                            "emplacement": id_sel,
+                            "est_place": True,
+                            "date_resa": str(date_travail),
+                            "statut": "Occupé",
+                            "heure_arrivee": h_a,
+                            "heure_depart": h_d,
+                            "montant": frais_estimés,
+                            "notes": notes_inst.strip(),
+                            "transats_payes": False,
+                            "conso_ardoise": 0.0,
+                            "paye_direct": 0.0
+                        }
+                        sauvegarder_reservation(nouvelle_resa_directe)
+                        st.success(f"Client {nom} installé sur le transat {id_sel}.")
+                        st.session_state.place_selectionnee = None
+                        safe_rerun()
+                        
+        # CAS 2 : L'emplacement sélectionné est OCCUPÉ
+        else:
+            client_local = occupation_transats[id_sel]
+            
+            # Initialisation des clés de paiement locales si absentes
+            if "transats_payes" not in client_local: client_local["transats_payes"] = False
+            if "conso_ardoise" not in client_local: client_local["conso_ardoise"] = 0.0
+            if "paye_direct" not in client_local: client_local["paye_direct"] = 0.0
+            if "historique_conso" not in client_local: client_local["historique_conso"] = []
+
+            st.markdown(f"👤 **Client :** {client_local['client']} | 🪑 **Transats :** {client_local['transats']} | ⏰ **Arrivée :** {client_local['heure_arrivee']}")
+            if client_local.get("notes"):
+                st.caption(f"📝 *Note ou Consigne : {client_local['notes']}*")
+                
+            h_actuelle = datetime.now().strftime("%H:%M")
+            h_dep = st.text_input("⏳ Heure de départ réelle / ajustée :", client_local['heure_depart'], key=f"hd_{id_sel}")
+            
+            # Recalcul automatique si l'heure change
+            frais_transats = calculer_tarif_heures(client_local['heure_arrivee'], h_dep, client_local['transats'])
+            st.markdown(f"💰 **Tarif Transats recalculé : {frais_transats:.2f} €**")
+
+            st.write("---")
+            st.write("💳 **Règlement des Transats :**")
+            if not client_local["transats_payes"]:
+                st.warning(f"Montant Transats dû : {frais_transats:.2f} €")
+                if st.button("💵 Encaisser les transats (Sur le transat)", key=f"encaisser_transat_{id_sel}"):
+                    client_local["transats_payes"] = True
+                    client_local["paye_direct"] += frais_transats
+                    client_local["montant"] = frais_transats # Verrouille le prix des transats
+                    sauvegarder_reservation(client_local)
+                    st.success("Transats validés comme payés !")
+                    safe_rerun()
+            else:
+                st.success(f"✅ Transats déjà réglés")
+
+            st.write("---")
+            st.write("🛒 **Ajouter une Consommation :**")
+            produit_choisi = st.selectbox("Choisir l'article :", list(TARIFS_CONSO.keys()), key=f"sel_prod_{id_sel}")
+            prix_unitaire = TARIFS_CONSO[produit_choisi]
+            st.info(f"Prix de l'article : {prix_unitaire:.2f} €")
+            
+            col_btn_ard, col_btn_dir = st.columns(2)
+            with col_btn_ard:
+                if st.button("➕ Ajouter à l'Ardoise", key=f"btn_ard_{id_sel}"):
+                    client_local["conso_ardoise"] += prix_unitaire
+                    client_local["historique_conso"].append(f"{produit_choisi} (Ardoise - {prix_unitaire:.2f}€)")
+                    # Déstockage local
+                    if produit_choisi in st.session_state.stocks: st.session_state.stocks[produit_choisi] = max(0, st.session_state.stocks[produit_choisi] - 1)
+                    sauvegarder_reservation(client_local)
+                    st.success(f"{produit_choisi} ajouté à l'ardoise.")
+                    safe_rerun()
+            with col_btn_dir:
+                if st.button("⚡ Encaisser Direct (Espèce/CB)", key=f"btn_dir_{id_sel}"):
+                    client_local["paye_direct"] += prix_unitaire
+                    client_local["historique_conso"].append(f"{produit_choisi} (Payé Direct - {prix_unitaire:.2f}€)")
+                    if produit_choisi in st.session_state.stocks: st.session_state.stocks[produit_choisi] = max(0, st.session_state.stocks[produit_choisi] - 1)
+                    sauvegarder_reservation(client_local)
+                    st.success(f"{produit_choisi} encaissé en direct.")
+                    safe_rerun()
+
+            if client_local["historique_conso"]:
+                with st.expander("👀 Voir le détail de l'historique sur ce transat"):
+                    for item in client_local["historique_conso"]:
+                        st.text(f"• {item}")
+
+            st.write("---")
+            # Calcul des totaux finaux
+            reste_a_payer_transats = 0.0 if client_local["transats_payes"] else frais_transats
+            total_reste_a_payer = reste_a_payer_transats + client_local["conso_ardoise"]
+            
+            st.markdown(f"<div style='background-color: #10b981; color: white; padding: 10px; border-radius: 8px; text-align: center; font-size: 14px; font-weight: bold; margin-top: 5px;'>DÉJÀ ENCAISSÉ SUR CE TRANSAT : {client_local['paye_direct']:.2f} €</div>", unsafe_allow_html=True)
+            st.markdown(f"<div style='background-color: #1e3a8a; color: white; padding: 12px; border-radius: 8px; text-align: center; font-size: 18px; font-weight: bold; margin-top: 5px; margin-bottom: 10px;'>RESTE À PAYER AU DÉPART : {total_reste_a_payer:.2f} €</div>", unsafe_allow_html=True)
+
+            col_f1, col_f2 = st.columns(2)
+            with col_f1:
+                if st.button("💵 ENCAISSER LE RESTE & LIBÉRER LE TRANSAT", key=f"liberer_{id_sel}", type="primary"):
+                    # On nettoie l'emplacement sur la réservation
+                    client_local["emplacement"] = ""
+                    client_local["est_place"] = False
+                    client_local["statut"] = "Clôturé"
+                    # Ajout des gains validés au montant total de la facture finale
+                    client_local["montant"] = client_local["paye_direct"] + total_reste_a_payer
+                    sauvegarder_reservation(client_local)
+                    
+                    st.success(f"Emplacement {id_sel} libéré ! Le total final de {client_local['montant']:.2f}€ a été validé.")
+                    st.session_state.place_selectionnee = None
+                    safe_rerun()
+            with col_f2:
+                if st.button("Fermer la fiche", key=f"fermer_{id_sel}"):
+                    st.session_state.place_selectionnee = None
+                    safe_rerun()
 # ==============================================================================
 # PAGE 2 : 📝 RÉSERVATIONS DU JOUR
 # ==============================================================================
