@@ -125,11 +125,11 @@ if not st.session_state.autorise:
             else:
                 st.error("Mot de passe incorrect ❌")
 else:
-
-def charger_donnees_depuis_supabase():
-    # 1. Charger les transats
-    try:
-        rep_transats = supabase.table("transats").select("*").eq("date", aujourd_hui).execute()
+        # On décale la fonction de 4 espaces vers la droite
+        def charger_donnees_depuis_supabase():
+            # 1. Charger les transats (décalé de 8 espaces)
+            try:
+                rep_transats = supabase.table("transats").select("*").eq("date", aujourd_hui).execute()
         for ligne in rep_transats.data:
             id_c = ligne["numero_transat"] # ex: "L1-G2"
             if id_c in st.session_state.plage:
