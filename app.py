@@ -3,9 +3,9 @@ from supabase import create_client, Client
 import datetime
 
 # 1. Connexion sécurisée à ta base Supabase via les Secrets Streamlit
-url = st.secrets["https://xqcvqdoksggoawncvefl.supabase.co"]
-key = st.secrets["sb_publishable_2MMX6jS6pouTlHd3ARtotA_-imy1Qam"]
-supabase: Client = create_client(url, key)
+url = st.secrets["SUPABASE_URL"]
+key = st.secrets["SUPABASE_KEY"]
+supabase = create_client(url, key)
 
 # 2. On récupère la date du jour pour filtrer automatiquement
 aujourd_hui = str(datetime.date.today())
