@@ -422,6 +422,150 @@ if page == "🏖️ Plan de la plage":
             if col_f2.button("Fermer", key=f"fermer_{id_sel}"):
                 st.session_state.groupe_selectionne = None
                 safe_rerun()
+# ---------------------------
+# PAGE : Réservations
+# ---------------------------
+elif page == "📅 Réservations":
+    st.markdown("<h3 style='text-align: center; color: #854d0e;'>📅 GESTION DES RÉSERVATIONS</h3>", unsafe_allow_html=True)
+    st.write("---")
+    col_form, col_list = st.columns([2, 3])
+
+    with col_form:
+        date_resa = st.date_input("Date de la réservation", value=datetime.now().date(), key="resa_date")
+        emplacement = st.selectbox("Emplacement", sorted(list(st.session_state.plage.keys())), key="resa_emplacement")
+        client_resa = st.text_input("Nom du client", key="resa_client")
+        transats_resa = st.number_input("Nombre de transats", min_value=1, max_value=4, value=2, key="resa_transats")
+        periode_resa = st.selectbox("Période", ["Matin", "Journée", "Après-midi"], key="resa_periode")
+        if st.button("Enregistrer la réservation"):
+            date_clef = date_resa.strftime("%d/%m/%Y")
+            if date_clef not in st.session_state.reservations:
+                st.session_state.reservations[date_clef] = []
+            nouvelle = {"emplacement": emplacement, "client": client_resa, "transats": transats_resa, "periode": periode_resa}
+            st.session_state.reservations[date_clef].append(nouvelle)
+            try:
+                supabase.table("reservations").insert({
+                    "date": date_resa.isoformat(),
+                    "emplacement": emplacement,
+                    "nom_client": client_resa,
+                    "transats": transats_resa,
+                    "periode": periode_resa
+                }).execute()
+            except Exception as e:
+                st.warning("Impossible d'enregistrer sur Supabase (vérifie la table/policies).")
+                print("Erreur sauvegarde reservation:", e)
+            st.success("Réservation ajoutée.")
+            safe_rerun()
+
+    with col_list:
+        st.markdown("### 📋 Réservations enregistrées")
+        if not st.session_state.reservations:
+            st.info("Aucune réservation enregistrée.")
+        else:
+            for d, listes in sorted(st.session_state.reservations.items()):
+                with st.expander(f"{d} — {len(listes)} réservation(s)"):
+                    for i, r in enumerate(listes):
+                        st.write(f"**{r.get('client','-')}** — {r.get('emplacement')} — {r.get('transats')} transats — {r.get('periode')}")
+                        col_a, col_b = st.columns([1,1])
+                        if col_a.button("Supprimer", key=f"suppr_resa_{d}_{i}"):
+                            st.session_state.reservations[d].pop(i)
+                            safe_rerun()
+                        if col_b.button("Appliquer à la grille", key=f"apply_resa_{d}_{i}"):
+                            place = r.get("emplacement")
+                            if place in st.session_state.plage and st.session_state.plage[place].get("statut","Libre") == "Libre":
+                                st.session_state.plage[place].update({
+                                    "statut": "Occupé",
+                                    "client": r.get("client",""),
+                                    "nb_transats": r.get("transats",2),
+                                    "heure_arrivee": "09:00",
+                                    "transats_payes": False,
+                                    "prix_transats_encaisse": 0.0,
+                                    "conso_ardoise": 0.0,
+                                    "historique_conso": [],
+                                    "paye_direct": 0.0,
+                                    "historique_paye_direct": []
+                                })
+                                st.success("Réservation appliquée à la grille.")
+                            else:
+                                st.error("Place non disponible ou inexistante.")
+                            safe_rerun()
+                            
+# ---------------------------
+# PAGE : Chiffre d'Affaires
+# ---------------------------
+elif page == "📊 Chiffre d'Affaires":
+    st.markdown("<h3 style='text-align: center; color: #854d0e;'>📊 CHIFFRE D'AFFAIRES</h3>", unsafe_allow_html=True)
+    st.write("---")
+    col1, col2 = st.columns([2,1])
+    with col1:
+        st.metric("CA (jour)", f"{st.session_state.get('ca_jour', 0.0):.2f} €")
+        st.write("Détail des encaissements par emplacement :")
+        for id_c, info in st.session_state.plage.items():
+            total_encaisse = info.get("paye_direct", 0.0) + info.get("prix_transats_encaisse", 0.0)
+            if total_encaisse > 0:
+                st.write(f"- {id_c} : {info.get('client','-')} — {total_encaisse:.2f} €")
+    with col2:
+        if st.button("Sauvegarder CA du jour dans Supabase"):
+            try:
+                supabase.table("ca_journalier").insert({
+                    "date": aujourd_hui,
+                    "ca_total": float(st.session_state.get("ca_jour", 0.0))
+                }).execute()
+                st.success("CA sauvegardé.")
+            except Exception as e:
+                st.error("Erreur sauvegarde CA (vérifie la table ca_journalier).")
+                print("Erreur sauvegarde CA:", e)
+        if st.button("Réinitialiser CA du jour (local)"):
+            st.session_state.ca_jour = 0.0
+            st.success("CA réinitialisé.")
+            safe_rerun()
+
+    st.write("---")
+    st.markdown("### Historique (dernières entrées Supabase)")
+    try:
+        rep = supabase.table("ca_journalier").select("*").order("date", desc=True).limit(10).execute()
+        rows = rep.data or []
+        if rows:
+            for r in rows:
+                st.write(f"- {r.get('date')} : {r.get('ca_total',0.0):.2f} €")
+        else:
+            st.info("Aucune donnée CA en base.")
+    except Exception:
+        st.info("Impossible de lire l'historique CA depuis Supabase (vérifie la table).")
+        
+# ---------------------------
+# PAGE : Récap Journalier
+# ---------------------------
+elif page == "📊 Récap Journalier":
+    st.markdown("<h3 style='text-align: center; color: #854d0e;'>📊 RÉCAP JOURNALIER</h3>", unsafe_allow_html=True)
+    st.write("---")
+    date_sel = st.date_input("Choisir une date", value=datetime.now().date(), key="recap_date")
+    date_clef = date_sel.strftime("%Y-%m-%d")
+
+    st.markdown("#### Transats enregistrés (Supabase)")
+    try:
+        rep_t = supabase.table("transats").select("*").eq("date", date_clef).execute()
+        rows_t = rep_t.data or []
+        if rows_t:
+            for r in rows_t:
+                st.write(f"- {r.get('numero_transat')} | {r.get('nom_client','-')} | {r.get('statut_paiement','-')} | {r.get('prix',0.0):.2f} €")
+        else:
+            st.info("Aucun transat enregistré pour cette date en base.")
+    except Exception:
+        st.info("Impossible de lire les transats depuis Supabase.")
+
+    st.write("---")
+    st.markdown("#### Consommations enregistrées (Supabase)")
+    try:
+        rep_c = supabase.table("consommations").select("*").eq("date", date_clef).execute()
+        rows_c = rep_c.data or []
+        if rows_c:
+            for c in rows_c:
+                st.write(f"- {c.get('article')} | qté: {c.get('quantite',1)} | {c.get('prix_total',0.0):.2f} € | transat: {c.get('numero_transat_associe','-')}")
+        else:
+            st.info("Aucune consommation enregistrée pour cette date en base.")
+    except Exception:
+        st.info("Impossible de lire les consommations depuis Supabase.")
+
 
 # Pédalos
 elif page == "🛶 Pédalos":
