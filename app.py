@@ -464,7 +464,44 @@ def charger_donnees_depuis_supabase():
         for p_id, p_info in st.session_state.pedalos.items():
             with st.container(border=True):
                 col_p1, col_p2, col_p3 = st.
-
+                
+                with col_p1:
+                    if p_info["statut"] == "Disponible":
+                        st.markdown(f"### 🔵 {p_id}")
+                        st.success("Disponible")
+                    else:
+                        st.markdown(f"### 🚣 {p_id}")
+                        st.error("En Mer")
+                        
+                with col_p2:
+                    if p_info["statut"] == "Disponible":
+                        nom_p = st.text_input("Nom du client :", key=f"nom_{p_id}", placeholder="Ex: Lucas")
+                        duree_p = st.radio("Durée demandée :", ["30 min (15€)", "1h (20€)"], key=f"dur_{p_id}", horizontal=True)
+                        h_dep_p = st.text_input("Heure de départ :", datetime.now().strftime("%H:%M"), key=f"hdep_{p_id}")
+                    else:
+                        st.markdown(f"👤 **Client :** {p_info['client']}")
+                        st.markdown(f"⏰ **Départ :** {p_info['heure_depart']} | **Forfait :** {p_info['duree_prevue']}")
+                        st.markdown(f"💰 **Montant à régler :** {p_info['total_du']:.2f} €")
+                        
+                with col_p3:
+                    st.write("")
+                    if p_info["statut"] == "Disponible":
+                        if st.button("🚀 Mettre à l'eau", key=f"btn_l_{p_id}", type="primary", use_container_width=True):
+                            if nom_p:
+                                prix_p = 15.0 if "30 min" in duree_p else 20.0
+                                st.session_state.pedalos[p_id].update({
+                                    "statut": "En Mer", "client": nom_p, "heure_depart": h_dep_p, "duree_prevue": duree_p, "total_du": prix_p
+                                })
+                                st.rerun()
+                            else:
+                                st.error("Entrez un nom")
+                    else:
+                        if st.button("💵 Retour & Encaisser", key=f"btn_r_{p_id}", type="primary", use_container_width=True):
+                            st.session_state.ca_jour += p_info["total_du"]
+                            st.session_state.pedalos[p_id].update({
+                                "statut": "Disponible", "client": "", "heure_depart": "", "duree_prevue": "1h", "total_du": 0.0
+                            })
+                            st.rerun()
     # ==========================================
     # MODULE : NOTES (TO-DO LIST)
     # ==========================================
