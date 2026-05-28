@@ -3,6 +3,26 @@ import streamlit as st
 from supabase import create_client, Client
 from datetime import datetime, date
 import traceback
+def safe_rerun():
+    """
+    Appelle la méthode de rerun disponible sur st.
+    Si l'attribut n'existe pas, on bascule un flag dans session_state
+    pour forcer un rerun implicite et on logge l'info.
+    """
+    try:
+        if hasattr(st, "experimental_rerun") and callable(st.experimental_rerun):
+            return st.experimental_rerun()
+    except Exception:
+        pass
+
+    try:
+        if hasattr(st, "rerun") and callable(st.rerun):
+            return st.rerun()
+    except Exception:
+        pass
+
+    st.session_state["_force_rerun_flag"] = not st.session_state.get("_force_rerun_flag", False)
+    st.write("DEBUG: safe_rerun fallback used (flag toggled). Vérifie la version de Streamlit.")
 
 # ==========================================
 # 0. SECRETS SUPABASE
@@ -87,7 +107,7 @@ if not st.session_state.autorise:
         if st.button("Ouvrir l'application 🔓", type="primary"):
             if mdp == mdp_secret:
                 st.session_state.autorise = True
-                st.experimental_rerun()
+                safe_rerun()
             else:
                 st.error("Mot de passe incorrect ❌")
     st.stop()
@@ -196,7 +216,7 @@ with st.sidebar:
     st.write("---")
     if st.button("🔒 Verrouiller l'app"):
         st.session_state.autorise = False
-        st.experimental_rerun()
+        safe_rerun()
 
 # ==========================================
 # 7. MODULES PRINCIPAUX
@@ -234,7 +254,7 @@ if page == "🏖️ Plan de la plage":
             label = f"🟢\n{l}-{g}" if info.get("statut", "Libre") == "Libre" else f"🔴\n{info.get('client', 'Occupé')}"
             if cols[g-1].button(label, key=f"btn_place_{id_c}"):
                 st.session_state.groupe_selectionne = id_c
-                st.experimental_rerun()
+                safe_rerun()
 
         with cols[5]:
             st.markdown("<div class='allee-verticale'>ALLÉE</div>", unsafe_allow_html=True)
@@ -246,7 +266,7 @@ if page == "🏖️ Plan de la plage":
             label = f"🟢\n{l}-{g}" if info.get("statut", "Libre") == "Libre" else f"🔴\n{info.get('client', 'Occupé')}"
             if cols[g].button(label, key=f"btn_place_{id_c}_r"):
                 st.session_state.groupe_selectionne = id_c
-                st.experimental_rerun()
+                safe_rerun()
 
     # Gestion de la place sélectionnée via modal
     if st.session_state.groupe_selectionne:
@@ -292,7 +312,7 @@ if page == "🏖️ Plan de la plage":
                     except Exception as e:
                         safe_print_exception("Erreur sauvegarde installation")
                     st.session_state.groupe_selectionne = None
-                    st.experimental_rerun()
+                    safe_rerun()
                 else:
                     st.error("Nom obligatoire.")
         else:
@@ -318,7 +338,7 @@ if page == "🏖️ Plan de la plage":
                         }).eq("date", aujourd_hui).eq("numero_transat", id_sel).execute()
                     except Exception as e:
                         safe_print_exception("Erreur mise à jour paiement transat")
-                    st.experimental_rerun()
+                    safe_rerun()
             else:
                 st.success(f"✅ Transats réglés en direct ({info.get('prix_transats_encaisse', 0.0):.2f} €)")
 
@@ -344,7 +364,7 @@ if page == "🏖️ Plan de la plage":
                         supabase.table("consommations").insert(nouvelle_conso).execute()
                     except Exception as e:
                         safe_print_exception("Erreur ajout ardoise")
-                    st.experimental_rerun()
+                    safe_rerun()
 
             with col_btn_dir:
                 if st.button("⚡ Encaisser Direct", key=f"btn_dir_{id_sel}"):
@@ -361,7 +381,7 @@ if page == "🏖️ Plan de la plage":
                         supabase.table("consommations").insert(nouvelle_conso).execute()
                     except Exception as e:
                         safe_print_exception("Erreur encaissement direct")
-                    st.experimental_rerun()
+                    safe_rerun()
 
             if info.get("historique_conso") or info.get("historique_paye_direct"):
                 with st.expander("👀 Voir le détail des consos"):
@@ -401,7 +421,7 @@ if page == "🏖️ Plan de la plage":
 
             if col_f2.button("Fermer", key=f"fermer_{id_sel}"):
                 st.session_state.groupe_selectionne = None
-                st.experimental_rerun()
+                safe_rerun()
 
 # Pédalos
 elif page == "🛶 Pédalos":
@@ -437,7 +457,7 @@ elif page == "🛶 Pédalos":
                             st.session_state.pedalos[p_id].update({
                                 "statut": "En Mer", "client": nom_val, "heure_depart": h_dep_p, "duree_prevue": st.session_state.get(f"dur_{p_id}", "1h"), "total_du": prix_p
                             })
-                            st.experimental_rerun()
+                            safe_rerun()
                         else:
                             st.error("Entrez un nom")
                 else:
@@ -446,7 +466,7 @@ elif page == "🛶 Pédalos":
                         st.session_state.pedalos[p_id].update({
                             "statut": "Disponible", "client": "", "heure_depart": "", "duree_prevue": "1h", "total_du": 0.0
                         })
-                        st.experimental_rerun()
+                        safe_rerun()
 
 # Notes
 elif page == "📝 Notes (To-Do List)":
@@ -456,7 +476,7 @@ elif page == "📝 Notes (To-Do List)":
     if col_btn.button("Ajouter"):
         if nouvelle_note:
             st.session_state.notes.append(nouvelle_note)
-            st.experimental_rerun()
+            safe_rerun()
     st.write("---")
     notes_a_supprimer = []
     for i, note in enumerate(st.session_state.notes):
@@ -465,7 +485,7 @@ elif page == "📝 Notes (To-Do List)":
     if notes_a_supprimer:
         for i in reversed(notes_a_supprimer):
             st.session_state.notes.pop(i)
-        st.experimental_rerun()
+        safe_rerun()
 
 # Stocks
 elif page == "📦 Stocks & Frigos":
@@ -493,10 +513,10 @@ elif page == "📦 Stocks & Frigos":
             btn_col1, btn_col2 = st.columns(2)
             if btn_col1.button("➕ 1", key=f"plus1_{produit}"):
                 st.session_state.stocks[produit] += 1
-                st.experimental_rerun()
+                safe_rerun()
             if btn_col2.button("➕ 10", key=f"plus10_{produit}"):
                 st.session_state.stocks[produit] += 10
-                st.experimental_rerun()
+                safe_rerun()
 
 # Autres pages placeholders
 else:
