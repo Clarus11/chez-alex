@@ -195,7 +195,7 @@ with st.sidebar:
 resas_du_jour = charger_reservations(date_travail)
 
 # ==============================================================================
-# PAGE 1 : 🏖️ PLAN DE LA PLAGE (Correction définitive : Ouverture & Espaces)
+# PAGE 1 : 🏖️ PLAN DE LA PLAGE (Correction : Validation & Rafraîchissement Synchrone)
 # ==============================================================================
 if page == "🏖️ Plan de la plage":
     st.markdown(f"<h3 style='color: #854d0e; text-align: center;'>PLAN DU JOUR — {date_travail.strftime('%d/%m/%Y')}</h3>", unsafe_allow_html=True)
@@ -208,7 +208,6 @@ if page == "🏖️ Plan de la plage":
     occupation_transats = {}
     for r in resas_du_jour:
         if r.get("est_place") and r.get("emplacement"):
-            # Sécurité : on découpe par virgule ET on enlève TOUS les espaces invisibles autour
             places = [p.strip() for p in str(r["emplacement"]).split(",") if p.strip()]
             for p in places:
                 occupation_transats[p] = r
@@ -227,14 +226,16 @@ if page == "🏖️ Plan de la plage":
                 with col_c3:
                     if st.button("Installer ✅", key=f"install_btn_{r['id']}", type="primary"):
                         if emplacement_choisi.strip():
-                            # Nettoyage des espaces pour éviter les bugs (ex: "1-1 ,  1-2" devient "1-1,1-2")
                             liste_places_propres = ",".join([p.strip() for p in emplacement_choisi.split(",") if p.strip()])
                             
+                            # MISE À JOUR DIRECTE DE LA RÉSERVATION
                             r["emplacement"] = liste_places_propres
                             r["est_place"] = True
+                            
+                            # Sauvegarde dans la base de données
                             sauvegarder_reservation(r)
                             
-                            # On mémorise le tout premier transat de la liste pour forcer l'ouverture de sa fiche
+                            # MISE À JOUR DIRECTE DANS LA MÉMOIRE LOCALE POUR ÉVITER LE DÉCALAGE
                             premiere_place = [p.strip() for p in liste_places_propres.split(",") if p.strip()][0]
                             st.session_state.place_selectionnee = premiere_place
                             
