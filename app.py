@@ -195,7 +195,7 @@ with st.sidebar:
 resas_du_jour = charger_reservations(date_travail)
 
 # ==============================================================================
-# PAGE 1 : 🏖️ PLAN DE LA PLAGE (Correction : Validation & Rafraîchissement Synchrone)
+# PAGE 1 : 🏖️ PLAN DE LA PLAGE (Correction ultime : Injection directe en mémoire)
 # ==============================================================================
 if page == "🏖️ Plan de la plage":
     st.markdown(f"<h3 style='color: #854d0e; text-align: center;'>PLAN DU JOUR — {date_travail.strftime('%d/%m/%Y')}</h3>", unsafe_allow_html=True)
@@ -203,14 +203,6 @@ if page == "🏖️ Plan de la plage":
     # Initialisation de la variable de sélection dans le session_state si elle n'existe pas
     if "place_selectionnee" not in st.session_state:
         st.session_state.place_selectionnee = None
-
-    # Cartographie de l'occupation actuelle des transats
-    occupation_transats = {}
-    for r in resas_du_jour:
-        if r.get("est_place") and r.get("emplacement"):
-            places = [p.strip() for p in str(r["emplacement"]).split(",") if p.strip()]
-            for p in places:
-                occupation_transats[p] = r
 
     # Liste d'attente pour le placement rapide
     clients_en_attente = [r for r in resas_du_jour if not r.get("est_place")]
@@ -228,14 +220,14 @@ if page == "🏖️ Plan de la plage":
                         if emplacement_choisi.strip():
                             liste_places_propres = ",".join([p.strip() for p in emplacement_choisi.split(",") if p.strip()])
                             
-                            # MISE À JOUR DIRECTE DE LA RÉSERVATION
+                            # 1. MODIFICATION FORCEE ET IMMEDIATE DANS LA LISTE EN MEMOIRE
                             r["emplacement"] = liste_places_propres
                             r["est_place"] = True
                             
-                            # Sauvegarde dans la base de données
+                            # 2. ENREGISTREMENT DANS LA BASE
                             sauvegarder_reservation(r)
                             
-                            # MISE À JOUR DIRECTE DANS LA MÉMOIRE LOCALE POUR ÉVITER LE DÉCALAGE
+                            # 3. ON FORCE LA SELECTION DU TRANSAT POUR OUVRIR LA FICHE
                             premiere_place = [p.strip() for p in liste_places_propres.split(",") if p.strip()][0]
                             st.session_state.place_selectionnee = premiere_place
                             
@@ -245,6 +237,14 @@ if page == "🏖️ Plan de la plage":
                             st.error("Indiquez un numéro.")
 
     st.write("---")
+    
+    # CARTOGRAPHIE DE L'OCCUPATION (Calculée juste avant l'affichage de la grille)
+    occupation_transats = {}
+    for r in resas_du_jour:
+        if r.get("est_place") and r.get("emplacement"):
+            places = [p.strip() for p in str(r["emplacement"]).split(",") if p.strip()]
+            for p in places:
+                occupation_transats[p] = r
     
     # Génération de la grille au format 1-1 jusqu'à 7-10
     for l in range(1, 8):
