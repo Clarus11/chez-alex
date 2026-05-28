@@ -19,8 +19,6 @@ def safe_rerun():
     except Exception:
         pass
     st.session_state["_force_rerun_flag"] = not st.session_state.get("_force_rerun_flag", False)
-    # message debug (peut être retiré en prod)
-    st.write("DEBUG: safe_rerun fallback used (flag toggled).")
 
 # -------------------------
 # utilitaires
@@ -50,7 +48,6 @@ def calculer_tarif_heures(heure_arr, heure_dep, nb_transats):
             libelle = f"Tarif Journée ({prix_u}€ × {nb_transats})"
         return prix_u * nb_transats, heures, libelle
     except Exception as e:
-        st.error(f"Erreur calcul tarif: {e}")
         print("Trace calcul_tarif_heures:")
         traceback.print_exc()
         return 15.0 * nb_transats, 0.0, "Tarif Journée (Défaut)"
@@ -196,7 +193,6 @@ if page == "🏖️ Plan de la plage":
     date_aujourdhui = datetime.now().strftime("%d/%m/%Y")
     resas_du_jour = st.session_state.reservations.get(date_aujourdhui, [])
 
-    # injecte réservations locales
     for resa in resas_du_jour:
         place = resa.get("emplacement")
         if place and place in st.session_state.plage and st.session_state.plage[place].get("statut", "Libre") == "Libre":
@@ -213,7 +209,6 @@ if page == "🏖️ Plan de la plage":
                 "historique_paye_direct": []
             })
 
-    # affichage grille
     for l in range(1, 8):
         st.caption(f"Ligne {l}")
         cols = st.columns([1,1,1,1,1,0.4,1,1,1,1,1])
@@ -234,7 +229,6 @@ if page == "🏖️ Plan de la plage":
                 st.session_state.groupe_selectionne = id_c
                 safe_rerun()
 
-    # gestion de la place sélectionnée (UI complète)
     if st.session_state.groupe_selectionne:
         id_sel = st.session_state.groupe_selectionne
         info = st.session_state.plage.get(id_sel, {})
@@ -272,8 +266,7 @@ if page == "🏖️ Plan de la plage":
                         }
                         supabase.table("transats").insert(nouvelle_resa).execute()
                     except Exception:
-                        st.warning("Impossible d'enregistrer l'installation sur Supabase.")
-                    st.success("Client installé.")
+                        pass
                     safe_rerun()
             else:
                 st.markdown(f"**Client :** {info_local.get('client','-')}  |  **Transats :** {info_local.get('nb_transats',2)}  |  **Arrivée :** {info_local.get('heure_arrivee','-')}")
@@ -295,8 +288,7 @@ if page == "🏖️ Plan de la plage":
                                 "statut_paiement": "Payé"
                             }).eq("date", aujourd_hui).eq("numero_transat", id_sel_local).execute()
                         except Exception:
-                            st.warning("Erreur mise à jour paiement transat sur Supabase.")
-                        st.success("Transats encaissés.")
+                            pass
                         safe_rerun()
                 else:
                     st.success(f"✅ Transats réglés ({info_local.get('prix_transats_encaisse',0.0):.2f} €)")
@@ -321,7 +313,7 @@ if page == "🏖️ Plan de la plage":
                             }
                             supabase.table("consommations").insert(nouvelle_conso).execute()
                         except Exception:
-                            st.warning("Erreur enregistrement consommation (ardoise).")
+                            pass
                         safe_rerun()
                 with col_btn_dir:
                     if st.button("⚡ Encaisser Direct", key=f"btn_dir_{id_sel_local}"):
@@ -338,7 +330,7 @@ if page == "🏖️ Plan de la plage":
                             }
                             supabase.table("consommations").insert(nouvelle_conso).execute()
                         except Exception:
-                            st.warning("Erreur enregistrement consommation (direct).")
+                            pass
                         safe_rerun()
                 if info_local.get("historique_conso") or info_local.get("historique_paye_direct"):
                     with st.expander("👀 Voir le détail des consos"):
@@ -364,7 +356,7 @@ if page == "🏖️ Plan de la plage":
                             "statut_paiement": "Libre"
                         }).eq("date", aujourd_hui).eq("numero_transat", id_sel_local).execute()
                     except Exception:
-                        st.warning("Erreur clôture transat sur Supabase.")
+                        pass
                     st.session_state.plage[id_sel_local] = {
                         "statut":"Libre","client":"","heure_arrivee":"","nb_transats":2,
                         "transats_payes":False,"prix_transats_encaisse":0.0,"conso_ardoise":0.0,
@@ -377,9 +369,7 @@ if page == "🏖️ Plan de la plage":
                     safe_rerun()
         gerer_place(id_sel)
 
-# ---------------------------
 # Réservations
-# ---------------------------
 elif page == "📅 Réservations":
     st.markdown("<h3 style='text-align: center; color: #854d0e;'>📅 GESTION DES RÉSERVATIONS</h3>", unsafe_allow_html=True)
     st.write("---")
@@ -405,8 +395,7 @@ elif page == "📅 Réservations":
                     "periode": periode_resa
                 }).execute()
             except Exception:
-                st.warning("Impossible d'enregistrer sur Supabase (vérifie la table/policies).")
-            st.success("Réservation ajoutée.")
+                pass
             safe_rerun()
     with col_list:
         st.markdown("### 📋 Réservations enregistrées")
@@ -429,14 +418,9 @@ elif page == "📅 Réservations":
                                     "heure_arrivee":"09:00","transats_payes":False,"prix_transats_encaisse":0.0,
                                     "conso_ardoise":0.0,"historique_conso":[],"paye_direct":0.0,"historique_paye_direct":[]
                                 })
-                                st.success("Réservation appliquée à la grille.")
-                            else:
-                                st.error("Place non disponible ou inexistante.")
                             safe_rerun()
 
-# ---------------------------
 # Chiffre d'Affaires
-# ---------------------------
 elif page == "📊 Chiffre d'Affaires":
     st.markdown("<h3 style='text-align: center; color: #854d0e;'>📊 CHIFFRE D'AFFAIRES</h3>", unsafe_allow_html=True)
     st.write("---")
@@ -460,7 +444,6 @@ elif page == "📊 Chiffre d'Affaires":
                 st.error("Erreur sauvegarde CA (vérifie la table ca_journalier).")
         if st.button("Réinitialiser CA du jour (local)"):
             st.session_state.ca_jour = 0.0
-            st.success("CA réinitialisé.")
             safe_rerun()
     st.write("---")
     st.markdown("### Historique (dernières entrées Supabase)")
@@ -475,9 +458,7 @@ elif page == "📊 Chiffre d'Affaires":
     except Exception:
         st.info("Impossible de lire l'historique CA depuis Supabase.")
 
-# ---------------------------
 # Récap Journalier
-# ---------------------------
 elif page == "📊 Récap Journalier":
     st.markdown("<h3 style='text-align: center; color: #854d0e;'>📊 RÉCAP JOURNALIER</h3>", unsafe_allow_html=True)
     st.write("---")
@@ -507,9 +488,7 @@ elif page == "📊 Récap Journalier":
     except Exception:
         st.info("Impossible de lire les consommations depuis Supabase.")
 
-# ---------------------------
 # Pédalos
-# ---------------------------
 elif page == "🛶 Pédalos":
     st.markdown("<h3 style='text-align: center; color: #854d0e;'>🛶 GESTION DE LA FLOTTE DE PÉDALOS</h3>", unsafe_allow_html=True)
     st.write("---")
@@ -553,9 +532,7 @@ elif page == "🛶 Pédalos":
                         })
                         safe_rerun()
 
-# ---------------------------
-# Notes (To-Do)
-# ---------------------------
+# Notes
 elif page == "📝 Notes (To-Do List)":
     st.markdown("<h3 style='color: #854d0e;'>📝 Cahier de Liaison & Besoins</h3>", unsafe_allow_html=True)
     col_note, col_btn = st.columns([4,1])
@@ -574,9 +551,7 @@ elif page == "📝 Notes (To-Do List)":
             st.session_state.notes.pop(i)
         safe_rerun()
 
-# ---------------------------
-# Stocks & Frigos
-# ---------------------------
+# Stocks
 elif page == "📦 Stocks & Frigos":
     st.markdown("<h3 style='color: #854d0e; text-align: center;'>📦 GESTION DES STOCKS & FRIGOS</h3>", unsafe_allow_html=True)
     st.write("---")
@@ -607,8 +582,5 @@ elif page == "📦 Stocks & Frigos":
                 st.session_state.stocks[produit] += 10
                 safe_rerun()
 
-# ---------------------------
-# Default
-# ---------------------------
 else:
     st.write("Page en construction ou non implémentée.")
