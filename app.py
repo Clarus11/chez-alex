@@ -111,7 +111,7 @@ def calculer_tarif_heures(heure_arr, heure_dep, nb_transats):
 if "autorise" not in st.session_state:
     st.session_state.autorise = False
 
-mdp_secret = st.secrets.get("password", "alex2026")
+mdp_secret = st.secrets.get("password", "PlageAlex2026!")
 
 # SI NON AUTORISÉ, ON AFFICHE LE LOGIN ET ON STOPPE L'APP
 if not st.session_state.autorise:
