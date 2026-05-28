@@ -461,10 +461,11 @@ def charger_donnees_depuis_supabase():
         st.write("Suivi des départs en mer et encaissement instantané.")
         st.write("---")
 
-        for p_id, p_info in st.session_state.pedalos.items():
-            with st.container(border=True):
-                col_p1, col_p2, col_p3 = st.
-                
+       for p_id, p_info in st.session_state.pedalos.items():
+        with st.container(border=True):
+            # Ligne 466 corrigée et complétée ici :
+            col_p1, col_p2, col_p3 = st.columns([2, 4, 3])
+            
                 with col_p1:
                     if p_info["statut"] == "Disponible":
                         st.markdown(f"### 🔵 {p_id}")
