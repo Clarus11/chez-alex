@@ -125,6 +125,7 @@ if not st.session_state.autorise:
             else:
                 st.error("Mot de passe incorrect ❌")
 else:
+        st.write("--- JE SUIS DANS LE ELSE ---") # <--- AJOUTE ÇA
         pass  # Indique à Python que le else est géré
 
 # COLLÉ TOUT À GAUCHE (Aucun espace avant def)
