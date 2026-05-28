@@ -125,30 +125,25 @@ if not st.session_state.autorise:
             else:
                 st.error("Mot de passe incorrect ❌")
 else:
-        # On décale la fonction de 4 espaces vers la droite
-        def charger_donnees_depuis_supabase():
-            # 1. Charger les transats (décalé de 8 espaces)
-            try:
-                rep_transats = supabase.table("transats").select("*").eq("date", aujourd_hui).execute()
+        pass  # Indique à Python que le else est géré
+
+# COLLÉ TOUT À GAUCHE (Aucun espace avant def)
+def charger_donnees_depuis_supabase():
+    # 4 espaces avant le try
+    try:
+        # 8 espaces avant la requête
+        rep_transats = supabase.table("transats").select("*").eq("date", aujourd_hui).execute()
+        # 8 espaces avant le for
         for ligne in rep_transats.data:
-            id_c = ligne["numero_transat"] # ex: "L1-G2"
+            # 12 espaces pour l'intérieur du for
+            id_c = ligne["numero_transat"]
             if id_c in st.session_state.plage:
-                st.session_state.plage[id_c]["statut"] = ligne["statut_paiement"] # Ou 'Occupé' selon ta logique
+                st.session_state.plage[id_c]["statut"] = ligne["statut_paiement"]
                 st.session_state.plage[id_c]["client"] = ligne["nom_client"]
                 st.session_state.plage[id_c]["prix_transats_encaisse"] = float(ligne["prix"])
+    # Aligné parfaitement sous le "try:" (4 espaces)
     except Exception as e:
         st.error(f"Erreur chargement transats: {e}")
-
-    # 2. Charger les pédalos
-    try:
-        rep_pedalos = supabase.table("pedalos").select("*").eq("date", aujourd_hui).execute()
-        for ligne in rep_pedalos.data:
-            nom_p = f"Pédalo {ligne['id']}" # Ou selon comment tu gères l'ID
-            if nom_p in st.session_state.pedalos:
-                st.session_state.pedalos[nom_p]["statut"] = ligne["statut"]
-                st.session_state.pedalos[nom_p]["client"] = "Client Cloud" # À adapter si tu as le nom
-    except Exception as e:
-        st.error(f"Erreur chargement pédalos: {e}")
 
     # ==========================================
    # 5. INITIALISATION DES STRUCTURES DE DONNÉES
