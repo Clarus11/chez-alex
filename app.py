@@ -405,6 +405,66 @@ if page == "🏖️ Plan de la plage":
                 st.session_state.groupe_selectionne = id_c
                 st.rerun()
 
+# =========================================================
+# 9. MODULE : PLAN DE LA PLAGE (VERSION CORRIGÉE)
+# =========================================================
+if page == "🏖️ Plan de la plage":
+    st.markdown("<h3 style='color: #854d0e; text-align: center;'>PLAN DU JOUR</h3>", unsafe_allow_html=True)
+    st.write("")
+
+    # Injection automatique des réservations du jour
+    for resa in resas_du_jour:
+        place = resa.get("emplacement")
+        if not place:
+            continue
+
+        # Normalisation : "1-3" → "L1-G3"
+        if "-" in place and not place.startswith("L"):
+            l, g = place.split("-")
+            place_norm = f"L{l}-G{g}"
+        else:
+            place_norm = place
+
+        if place_norm in st.session_state.plage and st.session_state.plage[place_norm]["statut"] == "Libre":
+            st.session_state.plage[place_norm].update({
+                "statut": "Occupé",
+                "client": resa["client"],
+                "nb_transats": resa.get("transats", 2),
+                "heure_arrivee": resa.get("heure_arrivee", "09:00"),
+                "transats_payes": resa.get("transats_payes", False),
+                "conso_ardoise": resa.get("conso_ardoise", 0.0),
+                "historique_conso": resa.get("historique_conso", []),
+                "paye_direct": resa.get("paye_direct", 0.0),
+                "historique_paye_direct": []
+            })
+
+    # --- AFFICHAGE DES 140 EMPLACEMENTS ---
+    for l in range(1, 8):
+        st.caption(f"Ligne {l}")
+        cols = st.columns([1,1,1,1,1,0.4,1,1,1,1,1])
+
+        # Groupes 1 à 5
+        for g in range(1, 6):
+            id_c = f"L{l}-G{g}"
+            info = st.session_state.plage[id_c]
+            label = f"🟢\n{l}-{g}" if info["statut"] == "Libre" else f"🔴\n{info['client']}"
+            if cols[g-1].button(label, key=id_c, type="secondary" if info["statut"]=="Libre" else "primary"):
+                st.session_state.groupe_selectionne = id_c
+                st.rerun()
+
+        # Allée centrale
+        with cols[5]:
+            st.markdown("<div class='allee-verticale'>ALLÉE</div>", unsafe_allow_html=True)
+
+        # Groupes 6 à 10
+        for g in range(6, 11):
+            id_c = f"L{l}-G{g}"
+            info = st.session_state.plage[id_c]
+            label = f"🟢\n{l}-{g}" if info["statut"] == "Libre" else f"🔴\n{info['client']}"
+            if cols[g].button(label, key=id_c, type="secondary" if info["statut"]=="Libre" else "primary"):
+                st.session_state.groupe_selectionne = id_c
+                st.rerun()
+
     # =========================================================
     # 10. FENÊTRE DE GESTION D’UN EMPLACEMENT
     # =========================================================
@@ -449,27 +509,7 @@ if page == "🏖️ Plan de la plage":
                             "historique_paye_direct": []
                         })
 
-                        # Création d'une réservation "passage"
-                        nouvelle_resa = {
-                            "client": nom,
-                            "telephone": "Passage",
-                            "transats": int(nb_t),
-                            "preference": "",
-                            "emplacement": f"{num_l}-{num_g}",
-                            "est_place": True,
-                            "date_resa": str(date_travail),
-                            "statut": "Occupé",
-                            "heure_arrivee": h_a,
-                            "heure_depart": "",
-                            "montant": 0.0,
-                            "transats_payes": False,
-                            "conso_ardoise": 0.0,
-                            "paye_direct": 0.0,
-                            "historique_conso": []
-                        }
-                        sauvegarder_reservation(nouvelle_resa)
                         sauvegarder_etat_global("plage", st.session_state.plage)
-
                         st.session_state.groupe_selectionne = None
                         st.rerun()
                     else:
@@ -524,14 +564,6 @@ if page == "🏖️ Plan de la plage":
                     sauvegarder_etat_global("plage", st.session_state.plage)
                     st.rerun()
 
-                # --- Récap conso ---
-                if info["historique_conso"] or info["historique_paye_direct"]:
-                    with st.expander("Voir les consommations"):
-                        for c in info["historique_conso"]:
-                            st.write("⏳", c)
-                        for c in info["historique_paye_direct"]:
-                            st.write("💵", c)
-
                 # --- Total final ---
                 reste_transats = 0 if info["transats_payes"] else montant
                 total_final = reste_transats + info["conso_ardoise"]
@@ -540,8 +572,12 @@ if page == "🏖️ Plan de la plage":
                 st.markdown(f"<div class='total-display'>Reste à payer : {total_final:.2f} €</div>", unsafe_allow_html=True)
 
                 col1, col2 = st.columns(2)
+
+                # 🔥🔥🔥 CORRECTION ICI 🔥🔥🔥
                 if col1.button("Encaisser & libérer", type="primary"):
                     st.session_state.ca_jour += total_final
+
+                    # Remise à zéro
                     st.session_state.plage[id_sel] = {
                         "statut": "Libre",
                         "client": "",
@@ -554,8 +590,11 @@ if page == "🏖️ Plan de la plage":
                         "paye_direct": 0.0,
                         "historique_paye_direct": []
                     }
-                    sauvegarder_etat_global("ca_jour", st.session_state.ca_jour)
+
+                    # 🔥 SAUVEGARDE OBLIGATOIRE (corrige ton bug)
                     sauvegarder_etat_global("plage", st.session_state.plage)
+                    sauvegarder_etat_global("ca_jour", st.session_state.ca_jour)
+
                     st.session_state.groupe_selectionne = None
                     st.rerun()
 
@@ -564,6 +603,7 @@ if page == "🏖️ Plan de la plage":
                     st.rerun()
 
         gerer_place(st.session_state.groupe_selectionne)
+
 # =========================================================
 # 11. MODULE : PÉDALOS
 # =========================================================
